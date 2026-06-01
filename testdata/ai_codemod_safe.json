@@ -1,0 +1,15 @@
+{
+  "id": "D2001",
+  "org": "orgA",
+  "source": 2,
+  "ci": 1,
+  "state": 0,
+  "changes": [
+    {
+      "file": "src/util/format.go",
+      "content": "gofmt-only whitespace changes",
+      "signals": ["pure-formatting"],
+      "complexity": 1
+    }
+  ]
+}

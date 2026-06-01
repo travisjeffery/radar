@@ -1,0 +1,16 @@
+{
+  "id": "D3003",
+  "org": "orgA",
+  "source": 3,
+  "runbook": "risky-runbook",
+  "ci": 1,
+  "state": 0,
+  "changes": [
+    {
+      "file": "src/foo/bar.go",
+      "content": "mechanical edit",
+      "signals": ["refactor-no-behavior-change"],
+      "complexity": 1
+    }
+  ]
+}

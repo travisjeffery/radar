@@ -1,0 +1,16 @@
+{
+  "id": "D1001",
+  "org": "orgA",
+  "source": 1,
+  "codemod_approved": true,
+  "ci": 1,
+  "state": 0,
+  "changes": [
+    {
+      "file": "src/api/client.go",
+      "content": "-import old\n+import new",
+      "signals": ["import-hygiene"],
+      "complexity": 1
+    }
+  ]
+}

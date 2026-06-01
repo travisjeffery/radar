@@ -1,0 +1,14 @@
+# Binaries
+/radar
+/radar-gh
+*.exe
+*.test
+*.out
+
+# Go
+/vendor/
+go.work
+go.work.sum
+
+# Editor / OS
+.DS_Store

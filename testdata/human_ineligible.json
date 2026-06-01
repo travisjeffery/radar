@@ -1,0 +1,23 @@
+{
+  "id": "D4003",
+  "org": "orgA",
+  "source": 0,
+  "ci": 1,
+  "state": 0,
+  "author": {
+    "name": "carol",
+    "eligible_role": true,
+    "has_oncall_ownership": false,
+    "tenure_days": 30,
+    "is_intern": true,
+    "diffs_last_year": 3
+  },
+  "changes": [
+    {
+      "file": "docs/readme.md",
+      "content": "fix typo",
+      "signals": ["doc-comment-update"],
+      "complexity": 0
+    }
+  ]
+}

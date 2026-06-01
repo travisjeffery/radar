@@ -1,0 +1,16 @@
+{
+  "id": "D3001",
+  "org": "orgA",
+  "source": 3,
+  "runbook": "dead-code-removal",
+  "ci": 1,
+  "state": 0,
+  "changes": [
+    {
+      "file": "src/legacy/unused.go",
+      "content": "remove unreferenced helper function",
+      "signals": ["dead-code-removal"],
+      "complexity": 1
+    }
+  ]
+}

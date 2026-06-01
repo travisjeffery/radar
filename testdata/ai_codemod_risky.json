@@ -1,0 +1,15 @@
+{
+  "id": "D2002",
+  "org": "orgA",
+  "source": 2,
+  "ci": 1,
+  "state": 0,
+  "changes": [
+    {
+      "file": "src/db/query.go",
+      "content": "build SQL by string concatenation from user input",
+      "signals": ["sql-injection"],
+      "complexity": 3
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "D4001",
+  "org": "orgA",
+  "source": 0,
+  "ci": 1,
+  "state": 0,
+  "author": {
+    "name": "alice",
+    "eligible_role": true,
+    "has_oncall_ownership": true,
+    "tenure_days": 900,
+    "is_intern": false,
+    "diffs_last_year": 240
+  },
+  "changes": [
+    {
+      "file": "docs/readme.md",
+      "content": "fix typo in docs",
+      "signals": ["doc-comment-update"],
+      "complexity": 0
+    }
+  ]
+}

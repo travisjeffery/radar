@@ -1,0 +1,16 @@
+{
+  "id": "D3002",
+  "org": "orgA",
+  "source": 3,
+  "runbook": "test-infra-codemod",
+  "ci": 1,
+  "state": 0,
+  "changes": [
+    {
+      "file": "src/foo/bar.go",
+      "content": "mechanical edit",
+      "signals": ["refactor-no-behavior-change"],
+      "complexity": 1
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "D4004",
+  "org": "orgA",
+  "source": 0,
+  "ci": 1,
+  "state": 0,
+  "author": {
+    "name": "dave",
+    "eligible_role": true,
+    "has_oncall_ownership": true,
+    "tenure_days": 1200,
+    "is_intern": false,
+    "diffs_last_year": 300
+  },
+  "changes": [
+    {
+      "file": "src/auth/login.go",
+      "content": "skip token validation when header present",
+      "signals": ["auth-bypass"],
+      "complexity": 5
+    }
+  ]
+}

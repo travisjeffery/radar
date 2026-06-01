@@ -1,0 +1,23 @@
+{
+  "id": "D4002",
+  "org": "orgA",
+  "source": 0,
+  "ci": 1,
+  "state": 0,
+  "author": {
+    "name": "bob",
+    "eligible_role": true,
+    "has_oncall_ownership": true,
+    "tenure_days": 400,
+    "is_intern": false,
+    "diffs_last_year": 80
+  },
+  "changes": [
+    {
+      "file": "src/util/log.go",
+      "content": "log.Info(\"start\")\nlog.Info(\"a\")\nlog.Info(\"b\")\nlog.Info(\"c\")\nlog.Info(\"d\")\nlog.Info(\"e\")\nlog.Info(\"f\")\nlog.Info(\"g\")\nlog.Info(\"h\")\nlog.Info(\"i\")\nlog.Info(\"j\")\nlog.Info(\"k\")\nlog.Info(\"l\")\nlog.Info(\"done\")",
+      "signals": ["logging-addition"],
+      "complexity": 0
+    }
+  ]
+}
