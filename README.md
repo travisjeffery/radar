@@ -9,6 +9,53 @@ auto-approved / auto-landed without human review (when it is genuinely low-risk)
 or must be routed to a human reviewer. This package implements that funnel as a
 small, dependency-free library plus a CLI.
 
+## Install
+
+Prebuilt archives for Linux, macOS, and Windows (amd64 + arm64) are attached to
+every [GitHub release](https://github.com/travisjeffery/radar/releases). Each
+archive contains both the `radar` and `radar-gh` commands.
+
+### Download a release binary
+
+Grab the archive for your platform from the
+[latest release](https://github.com/travisjeffery/radar/releases/latest), or
+from the command line (example: macOS Apple Silicon):
+
+```sh
+VERSION=0.1.0
+OS=darwin    # darwin | linux | windows
+ARCH=arm64   # amd64 | arm64
+curl -sSL -o radar.tar.gz \
+  "https://github.com/travisjeffery/radar/releases/download/v${VERSION}/radar_${VERSION}_${OS}_${ARCH}.tar.gz"
+tar -xzf radar.tar.gz radar radar-gh
+sudo mv radar radar-gh /usr/local/bin/   # or anywhere on your PATH
+radar -h
+```
+
+On Windows the asset is a `.zip` instead of a `.tar.gz`.
+
+With the [GitHub CLI](https://cli.github.com) you can download assets directly:
+
+```sh
+gh release download v0.1.0 --repo travisjeffery/radar --pattern '*darwin_arm64*'
+```
+
+### Verify the download (optional)
+
+Each release includes `checksums.txt` (SHA-256):
+
+```sh
+gh release download v0.1.0 --repo travisjeffery/radar --pattern 'checksums.txt'
+shasum -a 256 -c checksums.txt --ignore-missing
+```
+
+### Install with Go
+
+```sh
+go install github.com/travisjeffery/radar/cmd/radar@latest
+go install github.com/travisjeffery/radar/cmd/radar-gh@latest
+```
+
 ## The funnel
 
 `Engine.Classify(Diff)` routes a diff through the layered funnel and returns a
@@ -66,9 +113,12 @@ configurable, matching Table 1.
 
 ## CLI
 
-```
-go run ./cmd/radar classify [-llm] [-json] testdata/human_approved.json
-go run ./cmd/radar replay   [-llm]         testdata/diffs.json
+If you installed the release binaries, invoke `radar` and `radar-gh` directly.
+From a source checkout, use `go run ./cmd/radar` in place of `radar`.
+
+```sh
+radar classify [-llm] [-json] testdata/human_approved.json
+radar replay   [-llm]         testdata/diffs.json
 ```
 
 `classify` prints the decision and the stage-by-stage trace for one diff.
