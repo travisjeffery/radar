@@ -5,6 +5,9 @@
 *.test
 *.out
 
+# GoReleaser
+/dist/
+
 # Go
 /vendor/
 go.work
