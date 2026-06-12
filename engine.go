@@ -18,9 +18,10 @@ type Option func(*Engine)
 // WithScorer sets the DRS risk scorer (default HeuristicScorer).
 func WithScorer(s RiskScorer) Option { return func(e *Engine) { e.scorer = s } }
 
-// WithCalibrator sets the DRS calibrator (default: empty, mapping all scores to
-// percentile 0). Provide a calibrator built from a representative sample so DRS
-// thresholds are meaningful.
+// WithCalibrator sets the DRS calibrator (default: built from
+// DefaultCalibrationSample). Provide a calibrator built from a representative
+// sample of your own diff population so DRS thresholds are meaningful. An
+// explicitly empty calibrator fails closed (every diff maps to percentile 100).
 func WithCalibrator(c *Calibrator) Option { return func(e *Engine) { e.calibrator = c } }
 
 // WithReviewAgent sets the ACR review agent (default RuleBasedAgent).
@@ -33,12 +34,12 @@ func WithRunbooks(r RunbookRegistry) Option { return func(e *Engine) { e.runbook
 func WithPolicy(p OrgPolicyConfig) Option { return func(e *Engine) { e.policy = p } }
 
 // NewEngine builds an Engine with the paper's defaults — HeuristicScorer,
-// RuleBasedAgent, DefaultPolicy, an empty runbook registry, and an empty
-// calibrator — overridable via Options.
+// RuleBasedAgent, DefaultPolicy, an empty runbook registry, and a calibrator
+// built from DefaultCalibrationSample — overridable via Options.
 func NewEngine(opts ...Option) *Engine {
 	e := &Engine{
 		scorer:     HeuristicScorer{},
-		calibrator: NewCalibrator(nil),
+		calibrator: NewCalibrator(DefaultCalibrationSample()),
 		acr:        RuleBasedAgent{},
 		runbooks:   RunbookRegistry{},
 		policy:     DefaultPolicy(),
@@ -88,11 +89,30 @@ func (e *Engine) Classify(d Diff) *DecisionTrace {
 			t.add("runbook-onboarded", false, "runbook not onboarded: "+d.Runbook)
 			return t.finish(DecisionNotEligible, "eligibility")
 		}
-		eligible, threshold, reason := rb.eligibleForACE()
+		// Denylisting permanently excludes the runbook from automation: like an
+		// unapproved codemod, its diffs never enter an automated pipeline.
+		if rb.Denylisted {
+			t.add("runbook-eligibility", false, "runbook is denylisted")
+			return t.finish(DecisionNotEligible, "eligibility")
+		}
+		eligible, reason := rb.eligibleForACE()
 		if !t.add("runbook-eligibility", eligible, reason) {
 			return t.finish(DecisionRouteToHuman, "eligibility")
 		}
-		return e.runACE(d, threshold, t)
+		// The DRS threshold comes from org policy so per-org risk appetite
+		// applies to runbook sources, not just AI codemods.
+		threshold := e.policy.BotDefaultDRSThreshold
+		if rb.Allowlisted {
+			threshold = e.policy.BotAllowlistedDRSThreshold
+		}
+		res := e.runACE(d, threshold, t)
+		if res.Decision == DecisionAutoLand {
+			// Count the landing against the runbook's daily limit for the
+			// lifetime of this Engine.
+			rb.LandedToday++
+			e.runbooks[d.Runbook] = rb
+		}
+		return res
 
 	default:
 		t.add("source", false, "unknown source")

@@ -100,7 +100,9 @@ The two pieces that are proprietary/ML at Meta are interfaces here:
 - **`RiskScorer`** — the Diff Risk Score (DRS). `HeuristicScorer` is a
   transparent stand-in (size, complexity, risky paths, risk signals); a
   `Calibrator` maps raw scores to percentiles via an empirical CDF, so a
-  threshold `PX` means "only the safest X% qualify" (paper §2.3).
+  threshold `PX` means "only the safest X% qualify" (paper §2.3). An engine
+  built without `WithCalibrator` uses a built-in synthetic sample; an
+  explicitly empty calibrator fails closed (everything routes to human).
 - **`ReviewAgent`** — the Automated Code Review (ACR). `RuleBasedAgent` (default,
   offline, deterministic) classifies the paper's safe/risk signal taxonomy from
   structured change tags. `LLMAgent` (Anthropic) and `OpenAIAgent` (OpenAI) are
@@ -140,7 +142,9 @@ radar-gh -repo OWNER/REPO -limit 15 -llm [-human-drs 5] [-state all]
 
 PRs are treated as eligible human-authored diffs (GitHub PRs lack Meta's
 author-eligibility attributes), so the decision turns on content risk: the LLM
-ACR classifies each diff and the DRS threshold gates on calibrated risk.
+ACR classifies each diff and the DRS threshold gates on calibrated risk. CI and
+lifecycle state are taken from the PR itself — failing or pending checks fail
+the state gate, and PRs closed without merging count as rejected.
 `-human-drs` overrides the human DRS percentile threshold (paper default P5) for
 exploration. With `-llm` the ACR uses the OpenAI API (`$OPENAI_API_KEY`,
 optional `$RADAR_ACR_MODEL`, default `gpt-4o-mini`).

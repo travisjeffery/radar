@@ -1,5 +1,10 @@
 package radar
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // Decision is the terminal outcome RADAR assigns to a diff after routing it
 // through the funnel. The six outcomes correspond to the leaves of the
 // eligibility tree (Figure 2) and the bot / human pipelines (Figures 3 and 4).
@@ -48,6 +53,31 @@ func (d Decision) String() string {
 	default:
 		return "unknown"
 	}
+}
+
+// MarshalJSON encodes the decision as its string name, so serialized traces
+// are unambiguous (the int zero value is indistinguishable from route-to-human)
+// and stable if the constants are ever reordered.
+func (d Decision) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
+}
+
+// UnmarshalJSON accepts the string name produced by MarshalJSON.
+func (d *Decision) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	for _, dec := range []Decision{
+		DecisionRouteToHuman, DecisionNotEligible, DecisionBlanketAutoAccept,
+		DecisionAutoLand, DecisionVerificationPassed, DecisionRADARApproved,
+	} {
+		if dec.String() == s {
+			*d = dec
+			return nil
+		}
+	}
+	return fmt.Errorf("radar: unknown decision %q", s)
 }
 
 // Landed reports whether the decision results in the diff landing without

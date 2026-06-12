@@ -29,8 +29,14 @@ type LLMAgent struct {
 	// BaseURL is the Messages endpoint. Defaults to the public Anthropic API.
 	BaseURL string
 	// HTTP is the client used for requests. Defaults to a 60s-timeout client.
+	// Review additionally enforces a reviewTimeout deadline per call, so a
+	// caller-supplied client without a Timeout cannot block the funnel forever.
 	HTTP *http.Client
 }
+
+// reviewTimeout bounds a single ACR API call regardless of the configured
+// http.Client, so one hung request cannot wedge Engine.Classify indefinitely.
+const reviewTimeout = 60 * time.Second
 
 // NewLLMAgent constructs an LLMAgent from the environment ($ANTHROPIC_API_KEY,
 // $RADAR_ACR_MODEL). It returns an error if no API key is available.
@@ -90,7 +96,9 @@ type anthropicResp struct {
 // Review sends the diff to Claude and returns the parsed verdict, failing safe
 // (non-accept) on any error.
 func (a *LLMAgent) Review(d Diff) ACRResult {
-	res, err := a.review(context.Background(), d)
+	ctx, cancel := context.WithTimeout(context.Background(), reviewTimeout)
+	defer cancel()
+	res, err := a.review(ctx, d)
 	if err != nil {
 		return ACRResult{Accept: false, Confidence: 0, Summary: "ACR LLM error, failing safe: " + err.Error()}
 	}

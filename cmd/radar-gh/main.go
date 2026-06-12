@@ -15,7 +15,9 @@
 // NOTE: GitHub PRs do not carry Meta's author-eligibility attributes (SWE role,
 // oncall ownership, etc.). To let PRs reach the ACR/DRS stages, authors are
 // treated as eligible; the funnel then decides on content + risk, which is the
-// part worth testing against real code.
+// part worth testing against real code. CI and lifecycle state are real: each
+// PR's check rollup maps to the CI signal (no checks / pending → not green) and
+// PRs closed without merging are treated as rejected.
 package main
 
 import (
@@ -25,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/travisjeffery/radar"
 )
@@ -86,7 +89,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "  skipping PR #%d (diff fetch failed: %v)\n", pr.Number, err)
 			continue
 		}
-		d := toDiff(*repo, pr, raw)
+		d := toDiff(*repo, pr, raw, prCI(*repo, pr.Number))
 		diffs = append(diffs, d)
 		meta[d.ID] = pr
 	}
@@ -156,6 +159,40 @@ func prDiff(repo string, number int) (string, error) {
 	return string(out), nil
 }
 
+// prCI fetches the PR's check rollup and maps it to a CISignal: any failed
+// check is CIFailing, all-green is CIPassing, and no checks / pending checks /
+// a failed fetch are CIUnknown (not green, so the state gate fails closed).
+func prCI(repo string, number int) radar.CISignal {
+	out, err := runGH("pr", "view", fmt.Sprint(number), "--repo", repo, "--json", "statusCheckRollup")
+	if err != nil {
+		return radar.CIUnknown
+	}
+	var v struct {
+		StatusCheckRollup []struct {
+			Conclusion string `json:"conclusion"`
+			State      string `json:"state"`
+		} `json:"statusCheckRollup"`
+	}
+	if err := json.Unmarshal(out, &v); err != nil || len(v.StatusCheckRollup) == 0 {
+		return radar.CIUnknown
+	}
+	ci := radar.CIPassing
+	for _, c := range v.StatusCheckRollup {
+		s := c.Conclusion
+		if s == "" {
+			s = c.State
+		}
+		switch strings.ToUpper(s) {
+		case "FAILURE", "ERROR", "TIMED_OUT", "ACTION_REQUIRED":
+			return radar.CIFailing
+		case "SUCCESS", "NEUTRAL", "SKIPPED", "EXPECTED":
+		default: // pending or unrecognized: not green
+			ci = radar.CIUnknown
+		}
+	}
+	return ci
+}
+
 func runGH(args ...string) ([]byte, error) {
 	cmd := exec.Command("gh", args...)
 	cmd.Stderr = os.Stderr
@@ -165,14 +202,21 @@ func runGH(args ...string) ([]byte, error) {
 // --- diff conversion ---
 
 // toDiff converts a GitHub PR and its unified diff into a radar.Diff: human
-// source, eligible author (see package note), with one Change per file.
-func toDiff(repo string, pr ghPR, raw string) radar.Diff {
+// source with the PR's real CI signal and lifecycle state; only author
+// eligibility is fabricated (see package note). One Change per file.
+func toDiff(repo string, pr ghPR, raw string, ci radar.CISignal) radar.Diff {
+	state := radar.DiffPublished
+	if pr.State == "CLOSED" {
+		// Closed without merging (gh reports merged PRs as MERGED): the diff
+		// was effectively rejected.
+		state = radar.DiffRejected
+	}
 	return radar.Diff{
 		ID:     fmt.Sprintf("PR#%d", pr.Number),
 		Org:    repo,
 		Source: radar.SourceHuman,
-		CI:     radar.CIPassing,
-		State:  radar.DiffPublished,
+		CI:     ci,
+		State:  state,
 		Author: radar.Author{
 			Name:               pr.Author.Login,
 			EligibleRole:       true,
@@ -193,7 +237,7 @@ func splitUnifiedDiff(raw string) []radar.Change {
 	flush := func() {
 		if cur != nil {
 			if len(cur.Content) > perFileCap {
-				cur.Content = cur.Content[:perFileCap] + "\n...[truncated]"
+				cur.Content = cut(cur.Content, perFileCap) + "\n...[truncated]"
 			}
 			changes = append(changes, *cur)
 			cur = nil
@@ -217,7 +261,7 @@ func splitUnifiedDiff(raw string) []radar.Change {
 		// No recognizable file headers; keep the whole diff as one change.
 		c := raw
 		if len(c) > perFileCap {
-			c = c[:perFileCap] + "\n...[truncated]"
+			c = cut(c, perFileCap) + "\n...[truncated]"
 		}
 		changes = []radar.Change{{File: "(whole-diff)", Content: c}}
 	}
@@ -225,19 +269,37 @@ func splitUnifiedDiff(raw string) []radar.Change {
 }
 
 // parseGitFile extracts the b/ path from a "diff --git a/x b/y" header line.
+// Paths may contain spaces (and git quotes paths with special characters), so
+// the header is split on the last " b/" marker rather than on whitespace —
+// otherwise a path like ".github/workflows/ci cd.yml" would parse as "cd.yml"
+// and evade the path blocklist.
 func parseGitFile(line string) string {
-	fields := strings.Fields(line)
-	if len(fields) >= 4 {
-		return strings.TrimPrefix(fields[3], "b/")
+	rest := strings.TrimPrefix(line, "diff --git ")
+	if i := strings.LastIndex(rest, ` "b/`); i >= 0 {
+		return strings.TrimSuffix(rest[i+len(` "b/`):], `"`)
+	}
+	if i := strings.LastIndex(rest, " b/"); i >= 0 {
+		return rest[i+len(" b/"):]
 	}
 	return "(unknown)"
+}
+
+// cut returns s truncated to at most n bytes without splitting a UTF-8 rune.
+func cut(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
 }
 
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
-	return s[:n-1] + "…"
+	return cut(s, n-1) + "…"
 }
 
 func drsStr(p float64) string {

@@ -100,7 +100,7 @@ func TestClassifyRouting(t *testing.T) {
 			name:  "runbook denylisted",
 			diff:  func() Diff { d := passingDiff(SourceRACERRunbook); d.Runbook = "deny"; return d }(),
 			score: 1, acr: acceptVerdict(10), opts: []Option{WithRunbooks(registry)},
-			want: DecisionRouteToHuman,
+			want: DecisionNotEligible, // permanently excluded, never entered a pipeline
 		},
 		{
 			name:  "runbook allowlisted relaxed threshold lands",
@@ -113,6 +113,13 @@ func TestClassifyRouting(t *testing.T) {
 			diff:  func() Diff { d := passingDiff(SourceRACERRunbook); d.Runbook = "clean-strict"; return d }(),
 			score: 40, acr: acceptVerdict(10), opts: []Option{WithRunbooks(registry)},
 			want: DecisionRouteToHuman, // P20, 40 > 20
+		},
+		{
+			name:  "runbook threshold honors org policy",
+			diff:  func() Diff { d := passingDiff(SourceRACERRunbook); d.Runbook = "clean-allow"; return d }(),
+			score: 40, acr: acceptVerdict(10),
+			opts: []Option{WithRunbooks(registry), WithPolicy(policyTightBots())},
+			want: DecisionRouteToHuman, // org tightened allowlisted threshold to P5; 40 > 5
 		},
 		{
 			name:  "human approved (waives review)",
@@ -189,6 +196,29 @@ func policyNoDeferral() OrgPolicyConfig {
 	return p
 }
 
+func policyTightBots() OrgPolicyConfig {
+	p := DefaultPolicy()
+	p.BotAllowlistedDRSThreshold = 5
+	p.BotDefaultDRSThreshold = 5
+	return p
+}
+
+// TestRunbookDailyLimitEnforced verifies the engine counts auto-lands against
+// the runbook's daily limit and throttles once it is reached.
+func TestRunbookDailyLimitEnforced(t *testing.T) {
+	registry := RunbookRegistry{
+		"rb": {Name: "rb", Allowlisted: true, DailyLimit: 2, History: RiskHistory{LandedDiffs: 100}},
+	}
+	eng := testEngine(1, acceptVerdict(10), WithRunbooks(registry))
+	d := passingDiff(SourceRACERRunbook)
+	d.Runbook = "rb"
+	for i, want := range []Decision{DecisionAutoLand, DecisionAutoLand, DecisionRouteToHuman} {
+		if got := eng.Classify(d).Decision; got != want {
+			t.Fatalf("classification %d = %s, want %s", i+1, got, want)
+		}
+	}
+}
+
 func policyOnlyHuman() OrgPolicyConfig {
 	p := DefaultPolicy()
 	p.PermittedSources = map[SourceType]bool{SourceHuman: true}
@@ -198,29 +228,27 @@ func policyOnlyHuman() OrgPolicyConfig {
 func TestRunbookEligibility(t *testing.T) {
 	clean := RiskHistory{ProductionIncidents: 0, RevertRate: 0.01, RejectionRate: 0.01, LandedDiffs: 100}
 	tests := []struct {
-		name    string
-		rb      Runbook
-		wantOK  bool
-		wantThr float64
+		name   string
+		rb     Runbook
+		wantOK bool
 	}{
-		{"allowlisted clean", Runbook{Name: "a", Allowlisted: true, DailyLimit: 100, History: clean}, true, DRSBotAllowlisted},
-		{"non-allowlisted clean", Runbook{Name: "b", Allowlisted: false, DailyLimit: 100, History: clean}, true, DRSBotNonAllowlisted},
-		{"denylisted", Runbook{Name: "c", Denylisted: true}, false, 0},
-		{"blocked keyword test", Runbook{Name: "test-codemod", DailyLimit: 100, History: clean}, false, 0},
-		{"daily limit hit", Runbook{Name: "d", DailyLimit: 10, LandedToday: 10, History: clean}, false, 0},
-		{"has incident", Runbook{Name: "e", DailyLimit: 100, History: RiskHistory{ProductionIncidents: 1, LandedDiffs: 100}}, false, 0},
-		{"revert too high", Runbook{Name: "f", DailyLimit: 100, History: RiskHistory{RevertRate: 0.5, LandedDiffs: 100}}, false, 0},
-		{"rejection too high", Runbook{Name: "g", DailyLimit: 100, History: RiskHistory{RejectionRate: 0.5, LandedDiffs: 100}}, false, 0},
-		{"too few landed", Runbook{Name: "h", DailyLimit: 100, History: RiskHistory{LandedDiffs: 1}}, false, 0},
+		{"allowlisted clean", Runbook{Name: "a", Allowlisted: true, DailyLimit: 100, History: clean}, true},
+		{"non-allowlisted clean", Runbook{Name: "b", Allowlisted: false, DailyLimit: 100, History: clean}, true},
+		{"denylisted", Runbook{Name: "c", Denylisted: true}, false},
+		{"blocked keyword test", Runbook{Name: "test-codemod", DailyLimit: 100, History: clean}, false},
+		{"keyword inside larger token allowed", Runbook{Name: "migrate-to-latest-sdk", DailyLimit: 100, History: clean}, true},
+		{"no daily limit configured", Runbook{Name: "nolimit", History: clean}, false},
+		{"daily limit hit", Runbook{Name: "d", DailyLimit: 10, LandedToday: 10, History: clean}, false},
+		{"has incident", Runbook{Name: "e", DailyLimit: 100, History: RiskHistory{ProductionIncidents: 1, LandedDiffs: 100}}, false},
+		{"revert too high", Runbook{Name: "f", DailyLimit: 100, History: RiskHistory{RevertRate: 0.5, LandedDiffs: 100}}, false},
+		{"rejection too high", Runbook{Name: "g", DailyLimit: 100, History: RiskHistory{RejectionRate: 0.5, LandedDiffs: 100}}, false},
+		{"too few landed", Runbook{Name: "h", DailyLimit: 100, History: RiskHistory{LandedDiffs: 1}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ok, thr, reason := tt.rb.eligibleForACE()
+			ok, reason := tt.rb.eligibleForACE()
 			if ok != tt.wantOK {
 				t.Fatalf("ok = %v (%s), want %v", ok, reason, tt.wantOK)
-			}
-			if ok && thr != tt.wantThr {
-				t.Fatalf("threshold = %v, want %v", thr, tt.wantThr)
 			}
 		})
 	}
@@ -231,6 +259,24 @@ func TestEligibilityHelpers(t *testing.T) {
 		d := Diff{Changes: []Change{{Content: "TODO: do not merge this"}}}
 		if ok, _ := contentChecks(d); ok {
 			t.Fatal("expected content check to fail on blocklisted phrase")
+		}
+	})
+	t.Run("content blocklist word boundaries", func(t *testing.T) {
+		// Marker usage matches; substrings of words, identifiers, and path
+		// segments do not.
+		for _, content := range []string{"WIP: do not review yet", "// hack to work around the cache"} {
+			if ok, _ := contentChecks(Diff{Changes: []Change{{Content: content}}}); ok {
+				t.Fatalf("%q should match the blocklist", content)
+			}
+		}
+		for _, content := range []string{
+			"access would be wiped on restart",
+			"run deployer/hack/upgrade.sh first",
+			"join the hackathon channel",
+		} {
+			if ok, reason := contentChecks(Diff{Changes: []Change{{Content: content}}}); !ok {
+				t.Fatalf("%q should not match the blocklist: %s", content, reason)
+			}
 		}
 	})
 	t.Run("path blocklist", func(t *testing.T) {

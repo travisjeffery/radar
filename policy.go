@@ -1,6 +1,9 @@
 package radar
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 // DRS percentile thresholds used as defaults across the funnel (paper §2.3,
 // §2.8, Table 1). A threshold PX means only the lowest-risk X% of diffs pass:
@@ -54,11 +57,13 @@ type Runbook struct {
 	// Denylisted runbooks (e.g. ones that caused incidents, or that target
 	// sensitive areas) are permanently blocked from RADAR-landing.
 	Denylisted bool `json:"denylisted"`
-	// DailyLimit caps how many diffs the runbook may RADAR-land per day. Defaults
-	// are conservative; high-volume runbooks may be elevated up to 2000.
+	// DailyLimit caps how many diffs the runbook may RADAR-land per day. It must
+	// be configured: a runbook without a positive limit is ineligible (fail
+	// closed). High-volume runbooks may be elevated up to 2000.
 	DailyLimit int `json:"daily_limit"`
 	// LandedToday is how many diffs the runbook has already landed today; the
-	// runbook is throttled once it reaches DailyLimit.
+	// runbook is throttled once it reaches DailyLimit. The Engine increments
+	// this each time one of the runbook's diffs auto-lands.
 	LandedToday int `json:"landed_today"`
 	// History is the runbook's 60-day safety record.
 	History RiskHistory `json:"history"`
@@ -77,43 +82,59 @@ const (
 	MinRunbookLandedDiffs = 50
 )
 
-// blockedRunbookKeywords are substrings whose presence in a runbook name
+// blockedRunbookKeywords are name tokens whose presence in a runbook name
 // excludes it from automation (e.g. to avoid automating changes to test
-// infrastructure without human oversight) (paper §2.7.2, criterion 4).
+// infrastructure without human oversight) (paper §2.7.2, criterion 4). Tokens
+// are matched whole, so "test-infra" is blocked but "migrate-to-latest" is not.
 var blockedRunbookKeywords = []string{"test"}
 
-// eligibleForACE reports whether the runbook passes its per-runbook eligibility
-// criteria (risk history, daily limit, denylist, name keywords) and, if so,
-// which DRS threshold applies. The reason explains a failure.
-func (r Runbook) eligibleForACE() (ok bool, threshold float64, reason string) {
-	if r.Denylisted {
-		return false, 0, "runbook is denylisted"
-	}
-	for _, kw := range blockedRunbookKeywords {
-		if strings.Contains(strings.ToLower(r.Name), kw) {
-			return false, 0, "runbook name contains blocked keyword " + kw
+// nameHasKeyword reports whether any alphanumeric token of the runbook name
+// (split on '-', '_', and any other punctuation) equals the keyword.
+func nameHasKeyword(name, kw string) bool {
+	tokens := strings.FieldsFunc(strings.ToLower(name), func(r rune) bool {
+		return !('a' <= r && r <= 'z' || '0' <= r && r <= '9')
+	})
+	for _, tok := range tokens {
+		if tok == kw {
+			return true
 		}
 	}
-	if r.DailyLimit > 0 && r.LandedToday >= r.DailyLimit {
-		return false, 0, "runbook hit daily landing limit"
+	return false
+}
+
+// eligibleForACE reports whether the runbook passes its per-runbook eligibility
+// criteria (risk history, daily limit, name keywords). The reason explains a
+// failure. The Engine checks denylisting before this (a denylisted runbook is
+// DecisionNotEligible) and selects the DRS threshold from org policy based on
+// Runbook.Allowlisted.
+func (r Runbook) eligibleForACE() (ok bool, reason string) {
+	if r.Denylisted {
+		return false, "runbook is denylisted"
+	}
+	for _, kw := range blockedRunbookKeywords {
+		if nameHasKeyword(r.Name, kw) {
+			return false, "runbook name contains blocked keyword " + kw
+		}
+	}
+	if r.DailyLimit <= 0 {
+		return false, "runbook has no daily landing limit configured"
+	}
+	if r.LandedToday >= r.DailyLimit {
+		return false, "runbook hit daily landing limit"
 	}
 	if r.History.ProductionIncidents > 0 {
-		return false, 0, "runbook has production incidents in lookback window"
+		return false, "runbook has production incidents in lookback window"
 	}
 	if r.History.RevertRate > MaxRunbookRevertRate {
-		return false, 0, "runbook revert rate above cap"
+		return false, "runbook revert rate above cap"
 	}
 	if r.History.RejectionRate > MaxRunbookRejectionRate {
-		return false, 0, "runbook rejection rate above cap"
+		return false, "runbook rejection rate above cap"
 	}
 	if r.History.LandedDiffs < MinRunbookLandedDiffs {
-		return false, 0, "runbook has insufficient landed diffs for confidence"
+		return false, "runbook has insufficient landed diffs for confidence"
 	}
-	threshold = DRSBotNonAllowlisted
-	if r.Allowlisted {
-		threshold = DRSBotAllowlisted
-	}
-	return true, threshold, "runbook eligible"
+	return true, "runbook eligible"
 }
 
 // RunbookRegistry resolves runbook configurations by name.
@@ -145,9 +166,20 @@ type OrgPolicyConfig struct {
 	// PermittedSources restricts which automation sources may be automated. A nil
 	// or empty set permits all sources.
 	PermittedSources map[SourceType]bool `json:"-"`
-	// LandingDelay is the configurable delay (e.g. 24h) before an auto-landed bot
-	// diff actually lands, during which a human may still reject it.
+	// LandingDelay is the configurable delay (e.g. "24h", in time.ParseDuration
+	// syntax) before an auto-landed bot diff actually lands, during which a
+	// human may still reject it. It is validated and recorded on the trace when
+	// a diff auto-lands; a malformed value fails closed (route to human).
 	LandingDelay string `json:"landing_delay"`
+}
+
+// landingDelay parses LandingDelay. An empty value means landing immediately;
+// a malformed value is a misconfiguration the engine treats as a failed gate.
+func (p OrgPolicyConfig) landingDelay() (time.Duration, error) {
+	if p.LandingDelay == "" {
+		return 0, nil
+	}
+	return time.ParseDuration(p.LandingDelay)
 }
 
 // sourcePermitted reports whether the org permits automating the given source.

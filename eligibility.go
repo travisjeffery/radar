@@ -1,10 +1,14 @@
 package radar
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 // blocklistedPhrases are content phrases that, if present in a change, exclude a
 // diff from automation (paper §2.8, §2.9 content-level checks). These mark
-// changes that should always receive human eyes.
+// changes that should always receive human eyes. They are matched as standalone
+// words/phrases, not substrings (see blocklistedPhraseREs).
 var blocklistedPhrases = []string{
 	"do not merge",
 	"do not land",
@@ -13,6 +17,19 @@ var blocklistedPhrases = []string{
 	"fixme",
 	"security review required",
 }
+
+// blocklistedPhraseREs match each phrase only when it is not embedded in a
+// larger word, identifier, or path: the adjacent character may not be a letter,
+// digit, or identifier/path punctuation. Marker usage still matches ("WIP:",
+// "// hack to work around"), while "wiped", "hackathon", and paths like
+// "deployer/hack/upgrade.sh" do not.
+var blocklistedPhraseREs = func() []*regexp.Regexp {
+	res := make([]*regexp.Regexp, len(blocklistedPhrases))
+	for i, p := range blocklistedPhrases {
+		res[i] = regexp.MustCompile(`(?:^|[^a-z0-9_/.\-])` + regexp.QuoteMeta(p) + `(?:[^a-z0-9_/.\-]|$)`)
+	}
+	return res
+}()
 
 // blocklistedPathFragments are path fragments that require human review when a
 // diff touches them (paper §2.9 file suffix/prefix blocklists). Distinct from
@@ -27,9 +44,9 @@ var blocklistedPathFragments = []string{
 func contentChecks(d Diff) (ok bool, reason string) {
 	for _, c := range d.Changes {
 		lower := strings.ToLower(c.Content)
-		for _, phrase := range blocklistedPhrases {
-			if strings.Contains(lower, phrase) {
-				return false, "content matches blocklisted phrase: " + phrase
+		for i, re := range blocklistedPhraseREs {
+			if re.MatchString(lower) {
+				return false, "content matches blocklisted phrase: " + blocklistedPhrases[i]
 			}
 		}
 	}

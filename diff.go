@@ -93,8 +93,8 @@ const (
 // ChangeSignal is a semantic tag attached to an individual change in a diff,
 // describing what the change does. The ACR agent (paper §2.4) classifies a diff
 // by the signals present across its changes: a diff is safe to auto-land only
-// when it carries safe signals and zero risk signals. See acr.go for the safe
-// and risk signal taxonomies (SafeSignals / RiskSignals).
+// when every change carries a safe signal and none carries a risk signal. See
+// acr.go for the safe and risk signal taxonomies (SafeSignals / RiskSignals).
 type ChangeSignal string
 
 // Change is a single semantic unit of a diff (e.g. one hunk or one logical

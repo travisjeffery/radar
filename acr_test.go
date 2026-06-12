@@ -30,6 +30,16 @@ func TestRuleBasedAgent(t *testing.T) {
 			changes:    []Change{{Complexity: 1}},
 			wantAccept: false, wantConf: 5,
 		},
+		{
+			// Every change must be vouched: a safe signal on one change must
+			// not auto-accept sibling changes that carry no signals at all.
+			name: "unvouched sibling change rejects",
+			changes: []Change{
+				{Signals: []ChangeSignal{SignalDocCommentUpdate}, Complexity: 1},
+				{Complexity: 3},
+			},
+			wantAccept: false, wantConf: 5,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -59,8 +69,8 @@ func TestCalibratorPercentile(t *testing.T) {
 			t.Errorf("Percentile(%v) = %v, want %v", tt.raw, got, tt.want)
 		}
 	}
-	if got := NewCalibrator(nil).Percentile(5); got != 0 {
-		t.Errorf("empty calibrator should return 0, got %v", got)
+	if got := NewCalibrator(nil).Percentile(5); got != 100 {
+		t.Errorf("empty calibrator should fail closed with 100, got %v", got)
 	}
 }
 

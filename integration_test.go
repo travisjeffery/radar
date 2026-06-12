@@ -27,7 +27,7 @@ func TestClassifyTestdata(t *testing.T) {
 		"ai_codemod_safe":     DecisionAutoLand,
 		"ai_codemod_risky":    DecisionRouteToHuman,
 		"runbook_allowlisted": DecisionAutoLand,
-		"runbook_denylisted":  DecisionRouteToHuman,
+		"runbook_denylisted":  DecisionNotEligible,
 		"runbook_incident":    DecisionRouteToHuman,
 		"human_approved":      DecisionRADARApproved,
 		"human_verification":  DecisionVerificationPassed,

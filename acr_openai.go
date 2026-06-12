@@ -23,6 +23,8 @@ type OpenAIAgent struct {
 	// BaseURL is the chat-completions endpoint. Defaults to the public API.
 	BaseURL string
 	// HTTP is the client used for requests. Defaults to a 60s-timeout client.
+	// Review additionally enforces a reviewTimeout deadline per call, so a
+	// caller-supplied client without a Timeout cannot block the funnel forever.
 	HTTP *http.Client
 }
 
@@ -72,7 +74,9 @@ type openAIResp struct {
 // Review sends the diff to the OpenAI model and returns the parsed verdict,
 // failing safe (non-accept) on any error.
 func (a *OpenAIAgent) Review(d Diff) ACRResult {
-	res, err := a.review(context.Background(), d)
+	ctx, cancel := context.WithTimeout(context.Background(), reviewTimeout)
+	defer cancel()
+	res, err := a.review(ctx, d)
 	if err != nil {
 		return ACRResult{Accept: false, Confidence: 0, Summary: "ACR OpenAI error, failing safe: " + err.Error()}
 	}

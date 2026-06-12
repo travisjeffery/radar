@@ -1,6 +1,9 @@
 package radar
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // runACE executes the ACE (AI Commit Eligibility) pipeline for a bot diff
 // (paper §2.8, Figure 3). It evaluates three validation layers in order — all
@@ -45,7 +48,27 @@ func (e *Engine) runACE(d Diff, threshold float64, t *DecisionTrace) *DecisionTr
 		return t.finish(DecisionRouteToHuman, "ace")
 	}
 
+	// The auto-land is scheduled after the org's landing delay, during which a
+	// human may still reject it (paper §2.8). A malformed delay is a
+	// misconfiguration and fails closed.
+	delay, err := e.policy.landingDelay()
+	if !t.add("ace.landing-delay", err == nil, landingDelayReason(delay, err)) {
+		return t.finish(DecisionRouteToHuman, "ace")
+	}
+
 	return t.finish(DecisionAutoLand, "ace")
+}
+
+// landingDelayReason renders the landing-delay stage result.
+func landingDelayReason(delay time.Duration, err error) string {
+	switch {
+	case err != nil:
+		return "invalid landing_delay in org policy: " + err.Error()
+	case delay == 0:
+		return "auto-land immediate (no landing delay configured)"
+	default:
+		return fmt.Sprintf("auto-land after %s human-rejection window", delay)
+	}
 }
 
 // acrReason renders a short explanation of an ACR verdict for a stage result.

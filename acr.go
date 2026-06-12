@@ -2,8 +2,8 @@ package radar
 
 // Safe-signal taxonomy (paper §2.4). These are changes the ACR agent recognizes
 // as safe non-functional updates, or functional changes simple enough not to
-// require human judgment. A diff is auto-acceptable only when its changes carry
-// safe signals and NO risk signals.
+// require human judgment. A diff is auto-acceptable only when EVERY change
+// carries a safe signal and NO change carries a risk signal.
 const (
 	SignalRefactorNoBehaviorChange ChangeSignal = "refactor-no-behavior-change"
 	SignalDeadCodeRemoval          ChangeSignal = "dead-code-removal"
@@ -100,26 +100,37 @@ type RuleBasedAgent struct{}
 
 // Review collects safe and risk signals across the diff's changes (promoting
 // high-complexity changes to a high-review-effort risk signal) and applies the
-// conservative acceptance criterion.
+// conservative acceptance criterion: every change must carry at least one safe
+// signal, and no change may carry a risk signal.
 func (RuleBasedAgent) Review(d Diff) ACRResult {
 	var risk, safe []ChangeSignal
 	seenRisk := map[ChangeSignal]bool{}
 	seenSafe := map[ChangeSignal]bool{}
+	unvouched := 0
 
 	for _, c := range d.Changes {
 		if c.Complexity >= HighReviewEffortComplexity && !seenRisk[SignalHighReviewEffort] {
 			seenRisk[SignalHighReviewEffort] = true
 			risk = append(risk, SignalHighReviewEffort)
 		}
+		hasSafe := false
 		for _, sig := range c.Signals {
 			switch {
-			case isRiskSignal(sig) && !seenRisk[sig]:
-				seenRisk[sig] = true
-				risk = append(risk, sig)
-			case isSafeSignal(sig) && !seenSafe[sig]:
-				seenSafe[sig] = true
-				safe = append(safe, sig)
+			case isRiskSignal(sig):
+				if !seenRisk[sig] {
+					seenRisk[sig] = true
+					risk = append(risk, sig)
+				}
+			case isSafeSignal(sig):
+				hasSafe = true
+				if !seenSafe[sig] {
+					seenSafe[sig] = true
+					safe = append(safe, sig)
+				}
 			}
+		}
+		if !hasSafe {
+			unvouched++
 		}
 	}
 
@@ -130,13 +141,13 @@ func (RuleBasedAgent) Review(d Diff) ACRResult {
 		res.Confidence = 3
 		res.Accept = false
 		res.Summary = "risk signal(s) detected; routing to human"
-	case len(safe) == 0:
-		// No signal at all: the agent cannot vouch for the change.
+	case len(safe) == 0 || unvouched > 0:
+		// A change without a safe signal is one the agent cannot vouch for.
 		res.Confidence = 5
 		res.Accept = false
-		res.Summary = "no recognizable safe signal; insufficient confidence"
+		res.Summary = "change(s) without a recognizable safe signal; insufficient confidence"
 	default:
-		// Only safe signals: high confidence, accept.
+		// Every change carries a safe signal: high confidence, accept.
 		res.Confidence = 10
 		res.Accept = true
 		res.Summary = "only safe signals detected"

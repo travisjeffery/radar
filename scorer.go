@@ -69,9 +69,10 @@ type Calibrator struct {
 }
 
 // NewCalibrator builds a Calibrator from a calibration sample of raw scores. A
-// copy is sorted and retained. An empty sample yields a Calibrator that maps
-// every score to percentile 0 (everything passes) — callers should provide a
-// representative sample (the replay harness derives one from the input set).
+// copy is sorted and retained. An empty sample yields a Calibrator that fails
+// closed, mapping every score to percentile 100 (nothing passes a DRS gate) —
+// callers should provide a representative sample (the replay harness derives
+// one from the input set; see also DefaultCalibrationSample).
 func NewCalibrator(sample []float64) *Calibrator {
 	s := make([]float64, len(sample))
 	copy(s, sample)
@@ -81,11 +82,13 @@ func NewCalibrator(sample []float64) *Calibrator {
 
 // Percentile returns the percentile rank (0–100) of raw within the calibration
 // sample: the percentage of sample values strictly less than raw. With an empty
-// sample it returns 0.
+// sample it returns 100, treating every diff as maximally risky (fail closed).
 func (c *Calibrator) Percentile(raw float64) float64 {
 	n := len(c.sorted)
 	if n == 0 {
-		return 0
+		// Fail closed: with no calibration data the risk gate must block,
+		// not wave everything through.
+		return 100
 	}
 	// Number of sample values strictly less than raw.
 	below := sort.Search(n, func(i int) bool { return c.sorted[i] >= raw })
