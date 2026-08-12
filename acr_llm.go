@@ -65,10 +65,12 @@ SAFE signals (non-functional or low-risk): refactor-no-behavior-change, dead-cod
 
 RISK signals (require a human): high-review-effort, structural-change, bug-or-logic-error, performance-risk, secrets-exposure, sql-injection, auth-bypass.
 
-Auto-accept ONLY if your confidence is at least 8/10 AND there are zero risk signals. If any risk signal is present, do not accept.
+Auto-accept ONLY if your confidence is at least 8/10, every change has a recognized safe signal, there are zero risk signals, and there are no P0, P1, or P2 findings. If any of those conditions fail, do not accept.
 
 Respond with ONLY a JSON object, no prose, of the form:
-{"accept": bool, "confidence": int 0-10, "risk_signals": [string], "safe_signals": [string], "summary": string}`
+{"accept": bool, "confidence": int 0-10, "risk_signals": [string], "safe_signals": [string], "reviewed_files": [string], "findings": [{"severity":"P0|P1|P2|P3", "title":string, "file":string, "line":int, "summary":string}], "summary": string}
+
+reviewed_files must contain every changed file path exactly once.`
 
 // anthropic request/response shapes (minimal subset).
 type anthropicReq struct {
@@ -138,7 +140,7 @@ func (a *LLMAgent) review(ctx context.Context, d Diff) (ACRResult, error) {
 	if err != nil {
 		return ACRResult{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return ACRResult{}, err
@@ -174,36 +176,72 @@ func renderDiffForReview(d Diff) string {
 	return b.String()
 }
 
-// parseACRVerdict extracts the JSON verdict object from the model's text and
-// applies the conservative acceptance rule defensively (an accept is only
-// honored when confidence >= ACRMinConfidence and no risk signals are present).
+// parseACRVerdict validates the model's strict JSON verdict and independently
+// applies the conservative acceptance rule.
 func parseACRVerdict(text string) (ACRResult, error) {
-	start := strings.IndexByte(text, '{')
-	end := strings.LastIndexByte(text, '}')
-	if start < 0 || end <= start {
-		return ACRResult{}, fmt.Errorf("no JSON object in ACR response")
-	}
+	text = strings.TrimSpace(text)
 	var v struct {
-		Accept      bool     `json:"accept"`
-		Confidence  int      `json:"confidence"`
-		RiskSignals []string `json:"risk_signals"`
-		SafeSignals []string `json:"safe_signals"`
-		Summary     string   `json:"summary"`
+		Accept        bool            `json:"accept"`
+		Confidence    int             `json:"confidence"`
+		RiskSignals   []string        `json:"risk_signals"`
+		SafeSignals   []string        `json:"safe_signals"`
+		ReviewedFiles []string        `json:"reviewed_files"`
+		Findings      []ReviewFinding `json:"findings"`
+		Summary       string          `json:"summary"`
 	}
-	if err := json.Unmarshal([]byte(text[start:end+1]), &v); err != nil {
+	dec := json.NewDecoder(strings.NewReader(text))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&v); err != nil {
 		return ACRResult{}, err
 	}
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return ACRResult{}, fmt.Errorf("multiple JSON values in ACR response")
+		}
+		return ACRResult{}, fmt.Errorf("trailing content in ACR response: %w", err)
+	}
+	if v.Confidence < 0 || v.Confidence > 10 {
+		return ACRResult{}, fmt.Errorf("ACR confidence outside 0-10")
+	}
+	if strings.TrimSpace(v.Summary) == "" {
+		return ACRResult{}, fmt.Errorf("ACR summary is required")
+	}
 	res := ACRResult{
-		Confidence: v.Confidence,
-		Summary:    v.Summary,
+		Confidence:    v.Confidence,
+		ReviewedFiles: v.ReviewedFiles,
+		Findings:      v.Findings,
+		Summary:       v.Summary,
 	}
 	for _, s := range v.RiskSignals {
-		res.RiskSignals = append(res.RiskSignals, ChangeSignal(s))
+		signal := ChangeSignal(s)
+		if !isRiskSignal(signal) {
+			return ACRResult{}, fmt.Errorf("unknown risk signal %q", s)
+		}
+		res.RiskSignals = append(res.RiskSignals, signal)
 	}
 	for _, s := range v.SafeSignals {
-		res.SafeSignals = append(res.SafeSignals, ChangeSignal(s))
+		signal := ChangeSignal(s)
+		if !isSafeSignal(signal) {
+			return ACRResult{}, fmt.Errorf("unknown safe signal %q", s)
+		}
+		res.SafeSignals = append(res.SafeSignals, signal)
+	}
+	blockingFinding := false
+	for i := range res.Findings {
+		f := &res.Findings[i]
+		f.Severity = strings.ToUpper(strings.TrimSpace(f.Severity))
+		if f.Severity != "P0" && f.Severity != "P1" && f.Severity != "P2" && f.Severity != "P3" {
+			return ACRResult{}, fmt.Errorf("unknown finding severity %q", f.Severity)
+		}
+		if strings.TrimSpace(f.Title) == "" || strings.TrimSpace(f.Summary) == "" || f.Line < 0 {
+			return ACRResult{}, fmt.Errorf("finding title, summary, and non-negative line are required")
+		}
+		if f.Severity != "P3" {
+			blockingFinding = true
+		}
 	}
 	// Enforce the acceptance criterion regardless of what the model claimed.
-	res.Accept = v.Accept && v.Confidence >= ACRMinConfidence && len(res.RiskSignals) == 0
+	res.Accept = v.Accept && v.Confidence >= ACRMinConfidence && len(res.RiskSignals) == 0 && len(res.SafeSignals) > 0 && len(res.ReviewedFiles) > 0 && !blockingFinding
 	return res, nil
 }

@@ -94,7 +94,7 @@ func TestHeuristicScorerMonotonic(t *testing.T) {
 
 func TestParseACRVerdict(t *testing.T) {
 	t.Run("accepts clean verdict", func(t *testing.T) {
-		r, err := parseACRVerdict(`here is my answer: {"accept": true, "confidence": 9, "safe_signals": ["pure-formatting"], "summary": "ok"}`)
+		r, err := parseACRVerdict(`{"accept":true,"confidence":9,"risk_signals":[],"safe_signals":["pure-formatting"],"reviewed_files":["a.go"],"findings":[],"summary":"ok"}`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -113,7 +113,7 @@ func TestParseACRVerdict(t *testing.T) {
 		}
 	})
 	t.Run("low confidence not accepted", func(t *testing.T) {
-		r, err := parseACRVerdict(`{"accept": true, "confidence": 6, "safe_signals": ["logging-addition"]}`)
+		r, err := parseACRVerdict(`{"accept":true,"confidence":6,"safe_signals":["logging-addition"],"summary":"not confident enough"}`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -124,6 +124,34 @@ func TestParseACRVerdict(t *testing.T) {
 	t.Run("errors without json", func(t *testing.T) {
 		if _, err := parseACRVerdict("no json here"); err == nil {
 			t.Fatal("expected error")
+		}
+	})
+	t.Run("rejects prose around json", func(t *testing.T) {
+		if _, err := parseACRVerdict(`answer: {"accept":true,"confidence":10,"safe_signals":["pure-formatting"],"summary":"ok"}`); err == nil {
+			t.Fatal("expected strict JSON error")
+		}
+	})
+	t.Run("rejects unknown signals", func(t *testing.T) {
+		if _, err := parseACRVerdict(`{"accept":true,"confidence":10,"safe_signals":["looks-fine"],"summary":"ok"}`); err == nil {
+			t.Fatal("expected unknown signal error")
+		}
+	})
+	t.Run("blocking finding overrides accept", func(t *testing.T) {
+		r, err := parseACRVerdict(`{"accept":true,"confidence":10,"safe_signals":["test-addition"],"findings":[{"severity":"P2","title":"Flaky assertion","file":"test.go","line":12,"summary":"The test is timing-dependent."}],"summary":"finding present"}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Accept {
+			t.Fatal("P0-P2 findings must override accept")
+		}
+	})
+	t.Run("allows non-blocking finding", func(t *testing.T) {
+		r, err := parseACRVerdict(`{"accept":true,"confidence":10,"safe_signals":["doc-comment-update"],"reviewed_files":["README.md"],"findings":[{"severity":"P3","title":"Wording","file":"README.md","line":3,"summary":"Optional wording improvement."}],"summary":"safe"}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !r.Accept {
+			t.Fatal("P3 finding should not independently block acceptance")
 		}
 	})
 }

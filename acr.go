@@ -68,8 +68,8 @@ func isRiskSignal(s ChangeSignal) bool { return riskSignalSet[s] }
 
 // ACRResult is the verdict of an Automated Code Review pass: the detected safe
 // and risk signals, the agent's confidence (0–10), and the derived accept
-// decision. Accept is true only when confidence >= ACRMinConfidence and there
-// are no risk signals.
+// decision. API-backed agents only accept with sufficient confidence, complete
+// file coverage, recognized safe signals, no risk signals, and no P0-P2 finding.
 type ACRResult struct {
 	// Accept is the agent's auto-accept decision.
 	Accept bool `json:"accept"`
@@ -79,8 +79,22 @@ type ACRResult struct {
 	RiskSignals []ChangeSignal `json:"risk_signals,omitempty"`
 	// SafeSignals are the safe signals the agent found.
 	SafeSignals []ChangeSignal `json:"safe_signals,omitempty"`
+	// ReviewedFiles binds an agent verdict to every current changed path.
+	ReviewedFiles []string `json:"reviewed_files,omitempty"`
+	// Findings are concrete review findings. P0-P2 findings prevent automatic
+	// approval even when the model also reports an accept verdict.
+	Findings []ReviewFinding `json:"findings,omitempty"`
 	// Summary is a short human-readable explanation.
 	Summary string `json:"summary"`
+}
+
+// ReviewFinding is one structured issue found by a ReviewAgent.
+type ReviewFinding struct {
+	Severity string `json:"severity"`
+	Title    string `json:"title"`
+	File     string `json:"file,omitempty"`
+	Line     int    `json:"line,omitempty"`
+	Summary  string `json:"summary"`
 }
 
 // ReviewAgent is the RADAR Review Agent / Automated Code Review (ACR) component

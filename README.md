@@ -149,6 +149,56 @@ the state gate, and PRs closed without merging count as rejected.
 exploration. With `-llm` the ACR uses the OpenAI API (`$OPENAI_API_KEY`,
 optional `$RADAR_ACR_MODEL`, default `gpt-4o-mini`).
 
+### Risk-aware GitHub review automation
+
+`radar-gh review` is the production-oriented, provider adapter. It evaluates one
+exact pull request head against a versioned policy and emits a structured JSON
+decision:
+
+```sh
+radar-gh review \
+  -repo OWNER/REPOSITORY \
+  -pr 123 \
+  -policy .github/radar-policy.json \
+  -expected-head "$HEAD_SHA" \
+  -agent openai
+```
+
+The default example policy is `shadow`: a qualifying change produces
+`would-approve`, but Radar does not write to GitHub. Other outcomes are
+`route-to-human` or `policy-update-candidate`; Radar never merges a pull request
+and never submits `REQUEST_CHANGES`.
+
+The adapter fails closed unless it can prove all of the following from complete,
+paginated GitHub state:
+
+- the PR is open, ready, from the same repository, and targets an allowed base;
+- checks exist, are passing, and have the same fingerprint across two reads;
+- every changed file has a complete patch and one allow rule covers the whole PR;
+- no denied path or phrase matches either side of a rename;
+- no review requests changes and no review thread is unresolved;
+- the calibrated risk threshold and strict LLM review both pass.
+
+The LLM can veto an allowlisted change. A strong safe verdict outside the
+deterministic allowlist is only reported as a `policy-update-candidate`; it
+cannot approve the PR. Copy [the generic policy](examples/github-policy.json)
+and [GitHub Actions workflow](examples/github-actions/radar-review.yml) to start
+in shadow mode. Replace the illustrative calibration sample with scores from
+your own merged-PR history before considering approval mode.
+
+Approval is an explicit second rollout. Change the policy mode to `approve`,
+enable GitHub's branch-protection setting that dismisses stale approvals, and
+pass both `-apply` and the event's `-expected-head`. Radar then re-reads the
+head, checks, threads, reviews, and branch protection immediately before posting
+an approval bound to that commit. The initial shadow rollout intentionally does
+not require or enable stale-approval dismissal.
+
+The `openai` agent uses `$OPENAI_API_KEY`; `anthropic` uses
+`$ANTHROPIC_API_KEY`. Use a dedicated GitHub App or service account token with
+read access to repository contents, checks, pull requests, and review threads.
+Approval mode additionally needs branch-protection read access and pull-request
+review write access.
+
 ## Scope / non-goals
 
 - This reproduces RADAR's **decision logic and metric definitions**, not Meta's
