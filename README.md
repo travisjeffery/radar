@@ -147,7 +147,9 @@ lifecycle state are taken from the PR itself — failing or pending checks fail
 the state gate, and PRs closed without merging count as rejected.
 `-human-drs` overrides the human DRS percentile threshold (paper default P5) for
 exploration. With `-llm` the ACR uses the OpenAI API (`$OPENAI_API_KEY`,
-optional `$RADAR_ACR_MODEL`, default `gpt-4o-mini`).
+optional `$RADAR_ACR_MODEL`, default `gpt-4o-mini`). The OpenAI adapter uses the
+Responses API with strict structured output and explicitly disables response
+storage.
 
 ### Risk-aware GitHub review automation
 
