@@ -52,32 +52,42 @@ type ghPR struct {
 }
 
 func main() {
-	repo := flag.String("repo", "", "owner/repo to pull PRs from (required)")
-	limit := flag.Int("limit", 15, "number of PRs to classify")
-	state := flag.String("state", "all", "PR state filter: open, closed, merged, all")
-	useLLM := flag.Bool("llm", false, "use the OpenAI-backed ACR agent ($OPENAI_API_KEY)")
-	humanDRS := flag.Float64("human-drs", radar.DRSHumanDefault, "human-diff DRS percentile threshold (paper default P5)")
-	flag.Parse()
+	if len(os.Args) > 1 && os.Args[1] == "review" {
+		os.Exit(runReview(os.Args[2:]))
+	}
+	os.Exit(runReplay(os.Args[1:]))
+}
+
+func runReplay(args []string) int {
+	flags := flag.NewFlagSet("radar-gh", flag.ContinueOnError)
+	repo := flags.String("repo", "", "owner/repo to pull PRs from (required)")
+	limit := flags.Int("limit", 15, "number of PRs to classify")
+	state := flags.String("state", "all", "PR state filter: open, closed, merged, all")
+	useLLM := flags.Bool("llm", false, "use the OpenAI-backed ACR agent ($OPENAI_API_KEY)")
+	humanDRS := flags.Float64("human-drs", radar.DRSHumanDefault, "human-diff DRS percentile threshold (paper default P5)")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
 
 	if *repo == "" {
 		fmt.Fprintln(os.Stderr, "radar-gh: -repo OWNER/REPO is required")
-		os.Exit(2)
+		return 2
 	}
 
 	agent, agentName, err := newAgent(*useLLM)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "radar-gh:", err)
-		os.Exit(1)
+		return 1
 	}
 
 	prs, err := listPRs(*repo, *state, *limit)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "radar-gh: listing PRs:", err)
-		os.Exit(1)
+		return 1
 	}
 	if len(prs) == 0 {
 		fmt.Fprintln(os.Stderr, "radar-gh: no PRs found")
-		os.Exit(1)
+		return 1
 	}
 
 	// Build diffs first so DRS can be calibrated across the batch.
@@ -95,7 +105,7 @@ func main() {
 	}
 	if len(diffs) == 0 {
 		fmt.Fprintln(os.Stderr, "radar-gh: no diffs could be fetched")
-		os.Exit(1)
+		return 1
 	}
 
 	policy := radar.DefaultPolicy()
@@ -123,6 +133,7 @@ func main() {
 	fmt.Println()
 	fmt.Println(strings.Repeat("=", 78))
 	m.print()
+	return 0
 }
 
 func newAgent(useLLM bool) (radar.ReviewAgent, string, error) {

@@ -1,0 +1,44 @@
+name: radar-review
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radar-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out trusted policy
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Install Radar
+        run: go install github.com/travisjeffery/radar/cmd/radar-gh@latest
+
+      - name: Review exact pull request head
+        env:
+          GH_TOKEN: ${{ secrets.RADAR_GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: >-
+          radar-gh review
+          -repo "$GITHUB_REPOSITORY"
+          -pr "$PR_NUMBER"
+          -policy .github/radar-policy.json
+          -expected-head "$HEAD_SHA"
+          -agent openai

@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "mode": "shadow",
+  "allowed_base_branches": [
+    "main"
+  ],
+  "allow_rules": [
+    {
+      "name": "documentation-only",
+      "include": [
+        "README.md",
+        "docs/**",
+        "**/*.md"
+      ],
+      "exclude": [
+        ".github/**",
+        "**/runbooks/**",
+        "SECURITY.md"
+      ],
+      "statuses": [
+        "added",
+        "modified"
+      ],
+      "max_files": 4,
+      "max_changed_lines": 40
+    },
+    {
+      "name": "unit-tests-only",
+      "include": [
+        "**/*_test.go",
+        "**/test/**",
+        "**/tests/**"
+      ],
+      "exclude": [
+        "**/fixtures/**",
+        "**/snapshots/**",
+        "**/integration/**",
+        "**/acceptance/**"
+      ],
+      "statuses": [
+        "added"
+      ],
+      "max_files": 3,
+      "max_changed_lines": 60
+    }
+  ],
+  "deny_paths": [
+    ".github/**",
+    "**/auth/**",
+    "**/security/**",
+    "**/migrations/**",
+    "**/schema/**",
+    "**/infra/**",
+    "**/Dockerfile",
+    "**/go.mod",
+    "**/go.sum",
+    "**/package.json",
+    "**/package-lock.json",
+    "**/pnpm-lock.yaml",
+    "**/yarn.lock"
+  ],
+  "deny_phrases": [
+    "disable verification",
+    "skip authentication",
+    "ignore certificate"
+  ],
+  "max_files": 5,
+  "max_changed_lines": 80,
+  "max_risk_percentile": 20,
+  "calibration_sample": [
+    0,
+    0.5,
+    1,
+    1.5,
+    2,
+    3,
+    5,
+    8,
+    13,
+    21,
+    34,
+    55
+  ],
+  "min_review_confidence": 10,
+  "ignored_checks": [
+    "github-actions/review"
+  ],
+  "allow_skipped_checks": false
+}

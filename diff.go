@@ -108,6 +108,15 @@ type Change struct {
 	File string `json:"file"`
 	// Content is the raw text of the change (used by the LLM ACR adapter).
 	Content string `json:"content,omitempty"`
+	// PreviousFile is the old repository path for a renamed change.
+	PreviousFile string `json:"previous_file,omitempty"`
+	// Type is the provider-neutral change type: added, modified, removed,
+	// renamed, copied, changed, or unchanged.
+	Type string `json:"type,omitempty"`
+	// Additions and Deletions are exact line counts when the source provider
+	// reports them. They take precedence over estimating size from Content.
+	Additions int `json:"additions,omitempty"`
+	Deletions int `json:"deletions,omitempty"`
 	// Signals are the semantic tags for this change (safe and/or risk signals).
 	Signals []ChangeSignal `json:"signals,omitempty"`
 	// Complexity is the change's review-effort / complexity score. A score of 4
@@ -183,6 +192,10 @@ type Diff struct {
 func (d Diff) LinesChanged() int {
 	total := 0
 	for _, c := range d.Changes {
+		if c.Additions > 0 || c.Deletions > 0 {
+			total += c.Additions + c.Deletions
+			continue
+		}
 		// Count newlines plus one as a cheap line estimate.
 		lines := 1
 		for _, r := range c.Content {
