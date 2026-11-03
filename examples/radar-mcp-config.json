@@ -1,0 +1,34 @@
+{
+  "repositories": {
+    "your-org/*": {
+      "agent": "bedrock=us.anthropic.claude-opus-5-5,codex=openai.gpt-6.1-sol",
+      "env": {
+        "RADAR_BEDROCK_EFFORT": "high",
+        "RADAR_CODEX_EFFORT": "high",
+        "RADAR_FIREWORKS_EFFORT": "high"
+      }
+    },
+    "your-org/app": {
+      "agent": "bedrock=us.anthropic.claude-opus-5-5,codex=openai.gpt-6.1-sol",
+      "policy": ".github/radar-policy.json",
+      "env": {
+        "RADAR_BEDROCK_EFFORT": "high",
+        "RADAR_CODEX_EFFORT": "high",
+        "RADAR_FIREWORKS_EFFORT": "high"
+      }
+    }
+  },
+  "env": {
+    "AWS_REGION": "us-east-2",
+    "RADAR_CODEX_REGION": "us-east-1",
+    "RADAR_ACR_TIMEOUT": "780s",
+    "RADAR_ACR_MAX_TOKENS": "32768"
+  },
+  "limits": {
+    "reviews_per_hour": 10,
+    "in_flight_per_user": 1,
+    "concurrent_reviews": 1,
+    "review_wait": "45s",
+    "review_timeout": "45m"
+  }
+}

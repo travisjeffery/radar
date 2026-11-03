@@ -55,6 +55,24 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "review" {
 		os.Exit(runReview(os.Args[2:]))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "review-commit" {
+		os.Exit(runReviewCommit(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "clarify" {
+		os.Exit(runClarify(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "apply" {
+		os.Exit(runApply(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "approval-status" {
+		os.Exit(runApprovalStatus(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "trust-replay" {
+		os.Exit(runTrustReplay(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "repo-tools-mcp" {
+		os.Exit(runRepoToolsMCP(os.Args[2:]))
+	}
 	os.Exit(runReplay(os.Args[1:]))
 }
 
@@ -204,7 +222,7 @@ func prCI(repo string, number int) radar.CISignal {
 	return ci
 }
 
-func runGH(args ...string) ([]byte, error) {
+var runGH = func(args ...string) ([]byte, error) {
 	cmd := exec.Command("gh", args...)
 	cmd.Stderr = os.Stderr
 	return cmd.Output()

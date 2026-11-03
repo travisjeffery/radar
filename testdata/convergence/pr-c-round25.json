@@ -1,0 +1,255 @@
+{
+ "source": "an anonymised real pull request",
+ "round": 25,
+ "head": "812b9e480c2b1ebce938c64f3baf7b15776c745b",
+ "note": "Round 25 of 25. Round 24 held a P1 as raised late on unchanged lines; the push to round 25 left that file unchanged, yet an earlier Radar blocked on it as 'already blocking there' because the held P1 was its baseline. The prior findings here are round 24's as the adapter now passes them: held ones at P2. Findings first raised on unchanged lines are set apart as late. Rule ids are dropped: the test policy loads no review pack, so it would clear them from this round's findings only.",
+ "prior": {
+  "head": "652847f646e07d85c86a8d32867c4ac4f0cb1aa3",
+  "round": 24,
+  "findings": [
+   {
+    "id": "53ecbc5fda36",
+    "severity": "P2",
+    "title": "Finding 62",
+    "file": "pkg11/pkg17/file17.sh",
+    "line": 91
+   },
+   {
+    "id": "bcab699531d6",
+    "severity": "P2",
+    "title": "Finding 63",
+    "file": "pkg11/file26.go",
+    "line": 334
+   },
+   {
+    "id": "7faab966c170",
+    "severity": "P2",
+    "title": "Finding 64",
+    "file": "pkg11/pkg12/pkg18/pkg19/pkg20/pkg21/file21.js",
+    "line": 40
+   },
+   {
+    "id": "845053e3882e",
+    "severity": "P2",
+    "title": "Finding 65",
+    "file": "pkg11/pkg12/pkg18/file20.go",
+    "line": 1544
+   },
+   {
+    "id": "d42b32147770",
+    "severity": "P2",
+    "title": "Finding 66",
+    "file": "pkg11/pkg12/pkg18/file24.go",
+    "line": 334
+   },
+   {
+    "id": "307177ab769e",
+    "severity": "P3",
+    "title": "Finding 67",
+    "file": "pkg11/pkg17/pkg24/pkg25/file27.go",
+    "line": 15
+   },
+   {
+    "id": "b81b3a98b45f",
+    "severity": "P3",
+    "title": "Finding 68",
+    "file": "pkg11/pkg12/pkg18/pkg19/pkg20/pkg21/file28.js",
+    "line": 296
+   },
+   {
+    "id": "a5c4f13c5f80",
+    "severity": "P3",
+    "title": "Finding 69",
+    "file": "pkg11/pkg12/pkg18/file23.go",
+    "line": 132
+   },
+   {
+    "id": "4d34d5776292",
+    "severity": "P3",
+    "title": "Finding 70",
+    "file": "pkg11/pkg12/pkg18/file25.go",
+    "line": 168
+   },
+   {
+    "id": "7431b0227180",
+    "severity": "P3",
+    "title": "Finding 71",
+    "file": "pkg11/pkg12/pkg18/file29.go",
+    "line": 141
+   },
+   {
+    "id": "fc19949a8fc6",
+    "severity": "P3",
+    "title": "Finding 72",
+    "file": "pkg11/file26.go",
+    "line": 237
+   }
+  ],
+  "changes": [
+   {
+    "path": "pkg11/pkg17/pkg24/pkg25/file27.go",
+    "status": "modified",
+    "additions": 3,
+    "deletions": 2,
+    "patch": "@@ -13,9 +13,9 @@\n line\n line\n line\n-line\n+line\n line\n-line\n+line\n line\n line\n line\n@@ -34,6 +34,7 @@\n line\n line\n line\n+line\n line\n line\n line"
+   },
+   {
+    "path": "pkg11/pkg12/pkg18/pkg19/pkg20/pkg21/file21.js",
+    "status": "modified",
+    "additions": 8,
+    "deletions": 6,
+    "patch": "@@ -32,17 +32,19 @@\n line\n line\n line\n-line\n-line\n+line\n+line\n+line\n line\n line\n line\n-line\n-line\n-line\n line\n line\n-line\n+line\n+line\n+line\n+line\n+line\n line\n line\n line"
+   },
+   {
+    "path": "pkg11/pkg12/pkg18/file30.go",
+    "status": "modified",
+    "additions": 1,
+    "deletions": 0,
+    "patch": "@@ -222,6 +222,7 @@\n line\n line\n line\n+line\n line\n line\n line"
+   },
+   {
+    "path": "pkg11/pkg12/pkg18/file29.go",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 6,
+    "patch": "@@ -52,7 +52,6 @@\n line\n line\n line\n-line\n line\n line\n line\n@@ -137,11 +136,6 @@\n line\n line\n line\n-line\n-line\n-line\n-line\n-line\n line\n line\n line"
+   },
+   {
+    "path": "pkg11/pkg12/pkg18/file31.go",
+    "status": "modified",
+    "additions": 0,
+    "deletions": 1,
+    "patch": "@@ -380,7 +380,6 @@\n line\n line\n line\n-line\n line\n line\n line"
+   }
+  ],
+  "changes_complete": true
+ },
+ "resolved_findings": [],
+ "findings": [
+  {
+   "id": "067561210e2d",
+   "severity": "P1",
+   "title": "Finding 49",
+   "file": "pkg11/pkg17/file17.sh",
+   "line": 92,
+   "end_line": 98,
+   "summary": "Summary of finding 49"
+  },
+  {
+   "id": "bc7a09213c9d",
+   "severity": "P2",
+   "title": "Finding 50",
+   "file": "pkg11/pkg12/pkg18/pkg19/pkg20/pkg21/file18.js",
+   "line": 31,
+   "end_line": 34,
+   "summary": "Summary of finding 50"
+  },
+  {
+   "id": "977dac4403be",
+   "severity": "P2",
+   "title": "Finding 51",
+   "file": "pkg11/pkg12/pkg18/pkg19/pkg22/pkg23/file19.html",
+   "line": 8,
+   "summary": "Summary of finding 51"
+  },
+  {
+   "id": "5f3f8d0bf774",
+   "severity": "P2",
+   "title": "Finding 52",
+   "file": "pkg11/pkg12/pkg18/file20.go",
+   "line": 1535,
+   "end_line": 1560,
+   "summary": "Summary of finding 52"
+  },
+  {
+   "id": "582bb7bf1129",
+   "severity": "P2",
+   "title": "Finding 53",
+   "file": "pkg11/pkg12/pkg18/file20.go",
+   "line": 1546,
+   "end_line": 1549,
+   "summary": "Summary of finding 53"
+  },
+  {
+   "id": "3a6d8b6bd01b",
+   "severity": "P3",
+   "title": "Finding 54",
+   "file": "pkg11/pkg17/file17.sh",
+   "line": 96,
+   "end_line": 98,
+   "summary": "Summary of finding 54"
+  },
+  {
+   "id": "271a58728823",
+   "severity": "P3",
+   "title": "Finding 55",
+   "file": "pkg11/pkg12/pkg18/pkg19/pkg20/pkg21/file21.js",
+   "line": 40,
+   "end_line": 48,
+   "summary": "Summary of finding 55"
+  },
+  {
+   "id": "0bed127c8ee0",
+   "severity": "P3",
+   "title": "Finding 56",
+   "file": "pkg11/pkg12/pkg18/file22.go",
+   "line": 117,
+   "end_line": 126,
+   "summary": "Summary of finding 56"
+  },
+  {
+   "id": "422a05a4bbcc",
+   "severity": "P3",
+   "title": "Finding 57",
+   "file": "pkg11/pkg12/pkg18/file23.go",
+   "line": 132,
+   "end_line": 159,
+   "summary": "Summary of finding 57"
+  },
+  {
+   "id": "970423f38317",
+   "severity": "P3",
+   "title": "Finding 58",
+   "file": "pkg11/pkg12/pkg18/file24.go",
+   "line": 334,
+   "summary": "Summary of finding 58"
+  },
+  {
+   "id": "101fff681386",
+   "severity": "P3",
+   "title": "Finding 59",
+   "file": "pkg11/pkg12/pkg18/file25.go",
+   "line": 127,
+   "end_line": 143,
+   "summary": "Summary of finding 59"
+  },
+  {
+   "id": "ec117f43b308",
+   "severity": "P3",
+   "title": "Finding 60",
+   "file": "pkg11/pkg12/pkg18/file25.go",
+   "line": 166,
+   "end_line": 194,
+   "summary": "Summary of finding 60"
+  },
+  {
+   "id": "d07886986268",
+   "severity": "P3",
+   "title": "Finding 61",
+   "file": "pkg11/file26.go",
+   "line": 237,
+   "end_line": 248,
+   "summary": "Summary of finding 61"
+  }
+ ],
+ "want_held": {
+  "067561210e2d": "unchanged-lines"
+ },
+ "want_action": "would-approve",
+ "want_late": [
+  "bc7a09213c9d",
+  "977dac4403be",
+  "0bed127c8ee0",
+  "101fff681386"
+ ]
+}

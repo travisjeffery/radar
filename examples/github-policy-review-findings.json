@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "mode": "shadow",
+  "approval_basis": "review-findings",
+  "required_reviewers": 2,
+  "allow_stacked": true,
+  "allowed_base_branches": [
+    "main"
+  ],
+  "deny_paths": [
+    ".github/**",
+    "**/auth/**",
+    "**/security/**",
+    "**/migrations/**"
+  ],
+  "deny_phrases": [
+    "disable verification",
+    "skip authentication"
+  ],
+  "generated_files": {
+    "gitattributes": ".gitattributes",
+    "paths": [
+      "**/*.snap"
+    ],
+    "header_markers": [
+      "^// Code generated .* DO NOT EDIT\\.$",
+      "@generated"
+    ],
+    "note": "Lockfiles are checked in CI to match their manifests."
+  },
+  "max_risk_percentile": 100,
+  "calibration_sample": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "min_review_confidence": 8,
+  "blocking_finding_severities": [
+    "P0",
+    "P1"
+  ],
+  "allow_skipped_checks": true,
+  "lockfiles": {
+    "require_human_without_manifest": true,
+    "require_human_on_source_change": true
+  }
+}

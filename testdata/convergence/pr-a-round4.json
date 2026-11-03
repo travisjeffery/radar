@@ -1,0 +1,185 @@
+{
+ "source": "an anonymised real pull request",
+ "round": 4,
+ "prior": {
+  "head": "6cca9ffe25b2fe5cc2c9f8485a958c97f096bfda",
+  "round": 3,
+  "findings": [
+   {
+    "id": "4150f9516ced",
+    "severity": "P0",
+    "title": "Finding 8",
+    "file": "pkg1/pkg2/pkg3/file1.py",
+    "line": 324,
+    "end_line": 328
+   },
+   {
+    "id": "df7dab713f39",
+    "severity": "P0",
+    "title": "Finding 9",
+    "file": "pkg1/pkg4/pkg5/file2.py",
+    "line": 412,
+    "end_line": 414
+   },
+   {
+    "id": "a15b253ea397",
+    "severity": "P0",
+    "title": "Finding 10",
+    "file": "pkg1/pkg4/pkg5/file2.py",
+    "line": 544,
+    "end_line": 545
+   },
+   {
+    "id": "fe6e31f8d843",
+    "severity": "P0",
+    "title": "Finding 11",
+    "file": "pkg1/pkg4/pkg6/file3.py",
+    "line": 449,
+    "end_line": 458
+   },
+   {
+    "id": "d60006c82638",
+    "severity": "P0",
+    "title": "Finding 12",
+    "file": "pkg1/pkg4/pkg6/file3.py",
+    "line": 476,
+    "end_line": 478
+   },
+   {
+    "id": "a7e596e8d724",
+    "severity": "P1",
+    "title": "Finding 13",
+    "file": "pkg1/pkg2/pkg3/file1.py",
+    "line": 306,
+    "end_line": 306
+   },
+   {
+    "id": "cc2efb980398",
+    "severity": "P1",
+    "title": "Finding 14",
+    "file": "pkg1/pkg2/pkg3/file1.py",
+    "line": 337,
+    "end_line": 342
+   },
+   {
+    "id": "6315a6a12c1a",
+    "severity": "P1",
+    "title": "Finding 15",
+    "file": "pkg1/pkg2/pkg3/file1.py",
+    "line": 481,
+    "end_line": 486
+   },
+   {
+    "id": "246e151c6b13",
+    "severity": "P1",
+    "title": "Finding 16",
+    "file": "pkg1/pkg2/pkg7/file4.py",
+    "line": 222,
+    "end_line": 224
+   },
+   {
+    "id": "219cab49eb17",
+    "severity": "P1",
+    "title": "Finding 17",
+    "file": "pkg1/pkg4/pkg5/file5.py",
+    "line": 85,
+    "end_line": 85
+   },
+   {
+    "id": "204c20496350",
+    "severity": "P2",
+    "title": "Finding 18",
+    "file": "pkg1/pkg2/pkg8/pkg9/pkg10/file6.py",
+    "line": 78,
+    "end_line": 113
+   },
+   {
+    "id": "aa565c8040f7",
+    "severity": "P2",
+    "title": "Finding 19",
+    "file": "pkg1/pkg2/pkg7/file7.py",
+    "line": 92,
+    "end_line": 92
+   },
+   {
+    "id": "c8f543765394",
+    "severity": "P2",
+    "title": "Finding 20",
+    "file": "pkg1/pkg2/pkg7/file4.py",
+    "line": 218,
+    "end_line": 225
+   }
+  ],
+  "changes": [
+   {
+    "path": "pkg1/pkg2/pkg3/file1.py",
+    "status": "modified",
+    "patch": "@@ -325,6 +325,14 @@\n line\n line\n line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n line\n line\n line"
+   }
+  ],
+  "changes_complete": true
+ },
+ "resolved_findings": [],
+ "head": "0525b026c1d2f651ef6227901f34dd619c6f9a26",
+ "findings": [
+  {
+   "id": "396688f7c7f6",
+   "severity": "P0",
+   "title": "Finding 1",
+   "file": "pkg1/pkg2/pkg3/file1.py",
+   "line": 344,
+   "end_line": 350
+  },
+  {
+   "id": "cecfa6e17bdc",
+   "severity": "P0",
+   "title": "Finding 2",
+   "file": "pkg1/pkg4/pkg5/file2.py",
+   "line": 540,
+   "end_line": 545
+  },
+  {
+   "id": "220bccd8d49e",
+   "severity": "P0",
+   "title": "Finding 3",
+   "file": "pkg1/pkg4/pkg6/file3.py",
+   "line": 473,
+   "end_line": 482
+  },
+  {
+   "id": "1ba1633b0c70",
+   "severity": "P1",
+   "title": "Finding 4",
+   "file": "pkg1/pkg2/pkg3/file1.py",
+   "line": 306,
+   "end_line": 306
+  },
+  {
+   "id": "49cd8224d333",
+   "severity": "P1",
+   "title": "Finding 5",
+   "file": "pkg1/pkg2/pkg3/file1.py",
+   "line": 489,
+   "end_line": 506
+  },
+  {
+   "id": "31c7a28d1bd9",
+   "severity": "P1",
+   "title": "Finding 6",
+   "file": "pkg1/pkg2/pkg3/file1.py",
+   "line": 496,
+   "end_line": 505
+  },
+  {
+   "id": "1b320483ef86",
+   "severity": "P1",
+   "title": "Finding 7",
+   "file": "pkg1/pkg2/pkg7/file4.py",
+   "line": 219,
+   "end_line": 225
+  }
+ ],
+ "want_held": {},
+ "want_action": "route-to-human",
+ "note": "Round 4 of 10: every blocker counts. Each repeats a round-3 blocker near the same lines (one at 540, which round 3 cited at 544 in an unchanged file; one at 496, mapped across the push to within ten lines of round 3's P1 at 481) or sits on lines the push changed. The ten-line carry-over window errs toward counting."
+}

@@ -1,0 +1,47 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore"
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions-security:
+        applies-to: security-updates
+        patterns: ["*"]
+      github-actions-minor-patch:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    # Majors open only as security updates: Dependabot drops
+    # update-types ignores from security updates, so a major that is the
+    # only fix for an alert still opens.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore"
+    cooldown:
+      default-days: 7
+    groups:
+      gomod-security:
+        applies-to: security-updates
+        patterns: ["*"]
+      gomod-minor-patch:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    # Majors open only as security updates: Dependabot drops
+    # update-types ignores from security updates, so a major that is the
+    # only fix for an alert still opens.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
