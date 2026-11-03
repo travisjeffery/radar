@@ -48,7 +48,7 @@ func safePullRequestInput() PullRequestInput {
 		Title: "Clarify setup", BaseRef: "main", HeadSHA: strings.Repeat("a", 40),
 		Author: "contributor", Open: true, SameRepository: true,
 		ChecksObserved: true, ChecksStable: true, ChecksPassing: true,
-		CheckFingerprint: "stable", StaleApprovalsDismissed: true,
+		CheckFingerprint: "stable", ApprovalsKeptCurrent: true,
 		Files: []PullRequestFile{{
 			Path: "docs/setup.md", Status: "modified", Additions: 2, Deletions: 1,
 			Patch: "@@ -1 +1 @@\n-old\n+new", ContentComplete: true,
@@ -71,7 +71,7 @@ func TestPullRequestReviewerShadowWouldApprove(t *testing.T) {
 		t.Fatal(err)
 	}
 	in := safePullRequestInput()
-	in.StaleApprovalsDismissed = false
+	in.ApprovalsKeptCurrent = false
 	got := reviewer.Review(in)
 	if got.Action != PullRequestWouldApprove || !got.Eligible || got.MatchedRule != "documentation" {
 		t.Fatalf("got %+v", got)
@@ -81,7 +81,7 @@ func TestPullRequestReviewerShadowWouldApprove(t *testing.T) {
 	}
 }
 
-func TestPullRequestReviewerApprovalRequiresStaleDismissal(t *testing.T) {
+func TestPullRequestReviewerApprovalRequiresCurrentApprovals(t *testing.T) {
 	policy := testPullRequestPolicy(PullRequestModeApprove)
 	agent := &countingAgent{result: safeAgentResult()}
 	reviewer, err := NewPullRequestReviewer(policy, fixedScorer(0), agent)
@@ -89,12 +89,12 @@ func TestPullRequestReviewerApprovalRequiresStaleDismissal(t *testing.T) {
 		t.Fatal(err)
 	}
 	in := safePullRequestInput()
-	in.StaleApprovalsDismissed = false
+	in.ApprovalsKeptCurrent = false
 	got := reviewer.Review(in)
 	if got.Action != PullRequestRouteToHuman || agent.calls != 0 {
 		t.Fatalf("must fail before LLM: review=%+v calls=%d", got, agent.calls)
 	}
-	in.StaleApprovalsDismissed = true
+	in.ApprovalsKeptCurrent = true
 	got = reviewer.Review(in)
 	if got.Action != PullRequestApprove {
 		t.Fatalf("got action %q, want approve", got.Action)
@@ -189,6 +189,102 @@ func TestPathGlob(t *testing.T) {
 		got := matchesAnyPath(tc.path, []string{tc.pattern})
 		if got != tc.want {
 			t.Errorf("matchesAnyPath(%q, %q) = %t, want %t", tc.path, tc.pattern, got, tc.want)
+		}
+	}
+}
+
+type describedAgent struct{ RuleBasedAgent }
+
+func (describedAgent) Describe() string { return "fireworks/accounts/fireworks/models/test" }
+
+func TestPullRequestReviewRecordsReviewer(t *testing.T) {
+	tests := []struct {
+		name  string
+		agent ReviewAgent
+		want  string
+	}{
+		{name: "rule-based names itself", agent: RuleBasedAgent{}, want: "rule-based"},
+		{name: "described agent", agent: describedAgent{}, want: "fireworks/accounts/fireworks/models/test"},
+		{name: "undescribed agent stays blank", agent: staticAgent{}, want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reviewer, err := NewPullRequestReviewer(testPullRequestPolicy(PullRequestModeShadow), fixedScorer(0), tt.agent)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// An ineligible input still records who would have reviewed it.
+			out := reviewer.Review(PullRequestInput{ID: "x", HeadSHA: "abc", Open: false})
+			if out.Reviewer != tt.want {
+				t.Fatalf("reviewer = %q, want %q", out.Reviewer, tt.want)
+			}
+		})
+	}
+}
+
+type staticAgent struct{}
+
+func (staticAgent) Review(Diff) ACRResult { return ACRResult{Summary: "static"} }
+
+type fixedVerdictAgent struct{ res ACRResult }
+
+func (a fixedVerdictAgent) Review(Diff) ACRResult { return a.res }
+
+func TestPullRequestBlockingFindingSeverities(t *testing.T) {
+	p2Verdict := ACRResult{
+		Accept:        false,
+		ModelAccept:   true,
+		Confidence:    10,
+		SafeSignals:   []ChangeSignal{SignalDocCommentUpdate},
+		ReviewedFiles: []string{"docs/setup.md"},
+		Findings:      []ReviewFinding{{Severity: "P2", Title: "nit", Summary: "worth a look"}},
+		Summary:       "docs",
+	}
+	p1Verdict := p2Verdict
+	p1Verdict.Findings = []ReviewFinding{{Severity: "P1", Title: "bug", Summary: "breaks"}}
+	declined := p2Verdict
+	declined.ModelAccept = false
+	declined.Findings = nil
+
+	tests := []struct {
+		name     string
+		blocking []string
+		verdict  ACRResult
+		want     PullRequestAction
+	}{
+		{name: "default blocks P2", verdict: p2Verdict, want: PullRequestRouteToHuman},
+		{name: "P0/P1 policy lets P2 through", blocking: []string{"P0", "P1"}, verdict: p2Verdict, want: PullRequestWouldApprove},
+		{name: "P0/P1 policy still blocks P1", blocking: []string{"P0", "P1"}, verdict: p1Verdict, want: PullRequestRouteToHuman},
+		{name: "model declined", blocking: []string{"P0", "P1"}, verdict: declined, want: PullRequestRouteToHuman},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy := testPullRequestPolicy(PullRequestModeShadow)
+			policy.BlockingFindingSeverities = tt.blocking
+			reviewer, err := NewPullRequestReviewer(policy, fixedScorer(0), fixedVerdictAgent{tt.verdict})
+			if err != nil {
+				t.Fatal(err)
+			}
+			out := reviewer.Review(safePullRequestInput())
+			if out.Action != tt.want {
+				t.Fatalf("action = %s, want %s; stages %+v", out.Action, tt.want, out.Stages)
+			}
+		})
+	}
+}
+
+func TestPullRequestPolicyValidatesBlockingSeverities(t *testing.T) {
+	for _, tt := range []struct {
+		sev     []string
+		wantErr bool
+	}{
+		{nil, false}, {[]string{"P0", "P1"}, false}, {[]string{"p0", "p1", "p2"}, false},
+		{[]string{"P0"}, true}, {[]string{"P1", "P2"}, true}, {[]string{"P0", "P1", "P9"}, true},
+	} {
+		p := testPullRequestPolicy(PullRequestModeShadow)
+		p.BlockingFindingSeverities = tt.sev
+		if err := p.Validate(); (err != nil) != tt.wantErr {
+			t.Errorf("severities %v: err = %v, wantErr %t", tt.sev, err, tt.wantErr)
 		}
 	}
 }

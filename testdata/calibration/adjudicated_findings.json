@@ -1,0 +1,97 @@
+{
+  "source": "Thumbs-down Radar P0/P1 findings on a production monorepo, adjudicated against the code and anonymised. None held at P0/P1.",
+  "cases": [
+    {
+      "id": "migration-index-out-of-band",
+      "url": "https://github.com/example/app/pull/101#discussion_r1",
+      "reviewer": "fireworks/glm-5p3",
+      "file": "service/migrations/0042_add_outputs_column.sql",
+      "line": 55,
+      "reported_severity": "P1",
+      "title": "Concurrent index build runs under the startup probe and is missing from the out-of-band apply plan",
+      "impact": "CREATE INDEX CONCURRENTLY must scan the whole table, which on a large cluster can exceed the startup probe; the container is then killed mid-migration while holding the migration lock.",
+      "recommendation": "Include the index in the out-of-band pre-apply for large environments, and add a lock-clear step to the interrupted-migration runbook.",
+      "adjudication": "partly right, severity wrong: the deploy plan did miss the index (the author added it), but the new column is stored out of line, so the build is cheap.",
+      "max_severity": "P2",
+      "calibration": "repository-guidance",
+      "note": "Fixed by a guidance file next to the migrations, which Radar loads for migration files, not by the prompt."
+    },
+    {
+      "id": "migration-commit-in-do",
+      "url": "https://github.com/example/app/pull/101#discussion_r2",
+      "reviewer": "fireworks/glm-5p3",
+      "file": "service/migrations/0042_add_outputs_column.sql",
+      "line": 46,
+      "reported_severity": "P1",
+      "title": "The backfill's per-batch COMMIT inside a DO block can fail on re-run under the migration runner's connection state",
+      "impact": "The runner's no-transaction mode protects the normal path, but any runner that wraps the file in BEGIN (or a future migration tool change) turns this into an immediate ERROR: COMMIT is not allowed in a DO block.",
+      "recommendation": "This is acceptable as shipped if verified against the actual runner (the migration test does exercise it), but add a defensive comment or assert autocommit at the top of the block.",
+      "adjudication": "false positive: the changeset runs in autocommit, and a migration test runs it through the real runner twice. The finding concedes it is acceptable as shipped and needs a hypothetical runner to fail.",
+      "max_severity": "P3",
+      "calibration": "concession"
+    },
+    {
+      "id": "bulk-import-permissions",
+      "url": "https://github.com/example/app/pull/102#discussion_r3",
+      "reviewer": "codex/openai.gpt-6.1-sol",
+      "file": "agent/tools/authoring.py",
+      "line": 857,
+      "reported_severity": "P0",
+      "title": "Enforce resource permissions before exposing bulk import",
+      "impact": "The newly exposed bulk-write path calls an endpoint gated only by a create permission, so a caller with create and list permissions can create bundled resources their role denies.",
+      "recommendation": "Authorize every bundled resource operation in the API service before any writes.",
+      "adjudication": "facts right, attribution and severity wrong: the endpoint's permission check is pre-existing and by design, the pull request does not change the API service, and the tool calls it with the caller's token, so it grants no new privilege. A product-security question for an owner, not a P0.",
+      "max_severity": "P2",
+      "needs_human": true,
+      "calibration": "pre-existing"
+    },
+    {
+      "id": "flag-cutover-runbook",
+      "url": "https://github.com/example/app/pull/103#discussion_r4",
+      "reviewer": "fireworks/glm-5p3",
+      "file": "runbooks/batching/procedures.md",
+      "line": 40,
+      "reported_severity": "P1",
+      "title": "Cutover silently stops batching for tenants carried by the retired flags",
+      "impact": "A tenant enabled on the old flags reverts to the code defaults with no warning, no metric and no error; the only verification is a manual log check.",
+      "recommendation": "Add a one-release warning or gauge at config read time, or gate the old-flag removal behind a second pull request.",
+      "adjudication": "right, author accepted the risk: no automated detection exists, but the runbook already documents the manual check and few tenants are affected.",
+      "max_severity": "P2",
+      "calibration": "",
+      "note": "Not addressed: an operational-runbook risk with a documented manual check was proposed as P2 in the adjudication, but that rule was not approved for this change."
+    },
+    {
+      "id": "untested-stop-ordering",
+      "url": "https://github.com/example/app/pull/104#discussion_r5",
+      "reviewer": "bedrock/us.anthropic.claude-opus-5-5+codex/openai.gpt-6.1-sol",
+      "file": "worker/src/main/java/com/example/worker/WorkerApplication.java",
+      "line": 634,
+      "reported_severity": "P1",
+      "title": "No test checks lifecycle stop ordering in the wired applications",
+      "impact": "The flush guarantee depends on each application registering the fallback, then the producers, then every sender, in that order. A later refactor that moves a sender's registration earlier would silently drop buffered records again, and no test would fail.",
+      "recommendation": "Add a small test per service, or a shared helper test, that asserts the producers and the fallback come before the producing managed objects in the lifecycle.",
+      "max_severity": "P2",
+      "needs_human": false,
+      "calibration": "concrete-failure",
+      "note": "First raised in round 3 of 5 on lines the push had not changed. The ordering is correct as shipped; it fails only after a hypothetical later refactor, and the fix is a test, which the rubric rates P2."
+    }
+  ],
+  "boundary_cases": [
+    {
+      "id": "new-caller-existing-sink",
+      "source": "Radar's own review: a changed caller can introduce a risk through unchanged code",
+      "example": "The diff adds a handler that passes a request parameter to an existing runShell(cmd) helper the diff does not touch.",
+      "keeps_severity": "P0",
+      "why": "The changed line newly exposes the existing sink to attacker input, so the risk is introduced even though the vulnerable helper is unchanged.",
+      "calibration": "introduced-through-unchanged-code"
+    },
+    {
+      "id": "dormant-new-public-api",
+      "source": "Radar's own review: dormant newly added code keeps its severity",
+      "example": "The diff adds an exported ParseConfig that panics on an empty map; nothing calls it yet.",
+      "keeps_severity": "P1",
+      "why": "The defect is in code this change adds; a future caller only triggers it, so the concession cap does not apply.",
+      "calibration": "dormant-new-code"
+    }
+  ]
+}

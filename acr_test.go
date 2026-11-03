@@ -94,7 +94,7 @@ func TestHeuristicScorerMonotonic(t *testing.T) {
 
 func TestParseACRVerdict(t *testing.T) {
 	t.Run("accepts clean verdict", func(t *testing.T) {
-		r, err := parseACRVerdict(`{"accept":true,"confidence":9,"risk_signals":[],"safe_signals":["pure-formatting"],"reviewed_files":["a.go"],"findings":[],"summary":"ok"}`)
+		r, err := parseACRVerdict(`{"summary":"ok","risk":{"level":"low","reason":"test"},"where_to_look":[],"findings":[],"questions":[],"tests_suggested":[],"signals":{"safe":["pure-formatting"],"risk":[]},"coverage":{"files_reviewed":["a.go"],"repo_access":false,"limits":""},"needs_human":{"required":false,"reason":""},"confidence":9}`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -104,7 +104,7 @@ func TestParseACRVerdict(t *testing.T) {
 	})
 	t.Run("enforces criterion despite model accept", func(t *testing.T) {
 		// Model says accept but reports a risk signal: must be overridden to reject.
-		r, err := parseACRVerdict(`{"accept": true, "confidence": 10, "risk_signals": ["auth-bypass"], "summary": "x"}`)
+		r, err := parseACRVerdict(`{"summary":"x","risk":{"level":"low","reason":"test"},"where_to_look":[],"findings":[],"questions":[],"tests_suggested":[],"signals":{"safe":[],"risk":["auth-bypass"]},"coverage":{"files_reviewed":[],"repo_access":false,"limits":""},"needs_human":{"required":false,"reason":""},"confidence":10}`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -113,7 +113,7 @@ func TestParseACRVerdict(t *testing.T) {
 		}
 	})
 	t.Run("low confidence not accepted", func(t *testing.T) {
-		r, err := parseACRVerdict(`{"accept":true,"confidence":6,"safe_signals":["logging-addition"],"summary":"not confident enough"}`)
+		r, err := parseACRVerdict(`{"summary":"not confident enough","risk":{"level":"low","reason":"test"},"where_to_look":[],"findings":[],"questions":[],"tests_suggested":[],"signals":{"safe":["logging-addition"],"risk":[]},"coverage":{"files_reviewed":[],"repo_access":false,"limits":""},"needs_human":{"required":false,"reason":""},"confidence":6}`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -127,17 +127,17 @@ func TestParseACRVerdict(t *testing.T) {
 		}
 	})
 	t.Run("rejects prose around json", func(t *testing.T) {
-		if _, err := parseACRVerdict(`answer: {"accept":true,"confidence":10,"safe_signals":["pure-formatting"],"summary":"ok"}`); err == nil {
+		if _, err := parseACRVerdict(`answer: {"summary":"ok","risk":{"level":"low","reason":"test"},"where_to_look":[],"findings":[],"questions":[],"tests_suggested":[],"signals":{"safe":["pure-formatting"],"risk":[]},"coverage":{"files_reviewed":[],"repo_access":false,"limits":""},"needs_human":{"required":false,"reason":""},"confidence":10}`); err == nil {
 			t.Fatal("expected strict JSON error")
 		}
 	})
 	t.Run("rejects unknown signals", func(t *testing.T) {
-		if _, err := parseACRVerdict(`{"accept":true,"confidence":10,"safe_signals":["looks-fine"],"summary":"ok"}`); err == nil {
+		if _, err := parseACRVerdict(`{"summary":"ok","risk":{"level":"low","reason":"test"},"where_to_look":[],"findings":[],"questions":[],"tests_suggested":[],"signals":{"safe":["looks-fine"],"risk":[]},"coverage":{"files_reviewed":[],"repo_access":false,"limits":""},"needs_human":{"required":false,"reason":""},"confidence":10}`); err == nil {
 			t.Fatal("expected unknown signal error")
 		}
 	})
 	t.Run("blocking finding overrides accept", func(t *testing.T) {
-		r, err := parseACRVerdict(`{"accept":true,"confidence":10,"safe_signals":["test-addition"],"findings":[{"severity":"P2","title":"Flaky assertion","file":"test.go","line":12,"summary":"The test is timing-dependent."}],"summary":"finding present"}`)
+		r, err := parseACRVerdict(`{"summary":"finding present","risk":{"level":"low","reason":"test"},"where_to_look":[],"findings":[{"severity":"P2","title":"Flaky assertion","file":"test.go","line":12,"end_line":12,"impact":"The test is timing-dependent.","recommendation":"","rule_id":"","confidence":8}],"questions":[],"tests_suggested":[],"signals":{"safe":["test-addition"],"risk":[]},"coverage":{"files_reviewed":[],"repo_access":false,"limits":""},"needs_human":{"required":false,"reason":""},"confidence":10}`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -146,7 +146,7 @@ func TestParseACRVerdict(t *testing.T) {
 		}
 	})
 	t.Run("allows non-blocking finding", func(t *testing.T) {
-		r, err := parseACRVerdict(`{"accept":true,"confidence":10,"safe_signals":["doc-comment-update"],"reviewed_files":["README.md"],"findings":[{"severity":"P3","title":"Wording","file":"README.md","line":3,"summary":"Optional wording improvement."}],"summary":"safe"}`)
+		r, err := parseACRVerdict(`{"summary":"safe","risk":{"level":"low","reason":"test"},"where_to_look":[],"findings":[{"severity":"P3","title":"Wording","file":"README.md","line":3,"end_line":3,"impact":"Optional wording improvement.","recommendation":"","rule_id":"","confidence":8}],"questions":[],"tests_suggested":[],"signals":{"safe":["doc-comment-update"],"risk":[]},"coverage":{"files_reviewed":["README.md"],"repo_access":false,"limits":""},"needs_human":{"required":false,"reason":""},"confidence":10}`)
 		if err != nil {
 			t.Fatal(err)
 		}

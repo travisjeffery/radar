@@ -22,7 +22,7 @@ var blocklistedPhrases = []string{
 // larger word, identifier, or path: the adjacent character may not be a letter,
 // digit, or identifier/path punctuation. Marker usage still matches ("WIP:",
 // "// hack to work around"), while "wiped", "hackathon", and paths like
-// "deployer/hack/upgrade.sh" do not.
+// "infra/hack/upgrade.sh" do not.
 var blocklistedPhraseREs = func() []*regexp.Regexp {
 	res := make([]*regexp.Regexp, len(blocklistedPhrases))
 	for i, p := range blocklistedPhrases {

@@ -271,7 +271,7 @@ func TestEligibilityHelpers(t *testing.T) {
 		}
 		for _, content := range []string{
 			"access would be wiped on restart",
-			"run deployer/hack/upgrade.sh first",
+			"run infra/hack/upgrade.sh first",
 			"join the hackathon channel",
 		} {
 			if ok, reason := contentChecks(Diff{Changes: []Change{{Content: content}}}); !ok {

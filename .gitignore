@@ -1,6 +1,7 @@
 # Binaries
 /radar
 /radar-gh
+/radar-mcp
 *.exe
 *.test
 *.out
@@ -15,3 +16,6 @@ go.work.sum
 
 # Editor / OS
 .DS_Store
+
+# Radar MCP image build context (scripts/fetch-review-packs.sh)
+/review-packs/

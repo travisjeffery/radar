@@ -167,6 +167,23 @@ type Diff struct {
 
 	// Changes are the semantic units composing the diff.
 	Changes []Change `json:"changes,omitempty"`
+	// Withheld are changed files left out of Changes because they are
+	// generated. Review agents see their names and line counts only.
+	Withheld []GeneratedFile `json:"withheld,omitempty"`
+	// Lockfiles summarises each changed lockfile in Changes.
+	Lockfiles []LockfileSummary `json:"lockfiles,omitempty"`
+	// Criteria are the review packs and guidance selected for this change.
+	Criteria *ReviewContext `json:"criteria,omitempty"`
+	// ReviewNotes is policy context for the review agent.
+	ReviewNotes []string `json:"review_notes,omitempty"`
+	// PRContext is the pull request's description and context, rendered as
+	// a delimited untrusted block (see PullRequestContext). It informs the
+	// review but is not part of what a recorded review is keyed on.
+	PRContext string `json:"pr_context,omitempty"`
+	// Part and Parts number this diff when a large change is reviewed in
+	// several requests; zero means the diff is reviewed whole.
+	Part  int `json:"part,omitempty"`
+	Parts int `json:"parts,omitempty"`
 
 	// --- scope / safety metadata (paper §2.7.3, §2.8 static heuristics) ---
 

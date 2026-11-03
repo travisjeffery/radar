@@ -1,0 +1,46 @@
+# The hosted Radar review MCP (docs/mcp.md). One image runs both
+# containers of the pod: `radar-mcp serve` (the server container) and
+# `radar-mcp runner` (the reviewer container, which runs radar-gh and Codex).
+#
+# Build context: the repository, with the review packs your CI uses copied to
+# review-packs/ (an empty directory works when no rules file names packs).
+
+FROM golang:1.26.10-bookworm@sha256:fe3da92a5cb2881e4aa75e625cb0b7c50571632fb4cf340cbe53e6ccdcffdd51 AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+ARG VERSION=dev
+RUN CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/radar-mcp ./cmd/radar-mcp \
+ && CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags="-s -w" -o /out/radar-gh ./cmd/radar-gh
+
+FROM node:22.23.3-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
+ARG TARGETARCH
+# CI's radar-pr-review.yml codex-version default; keep them in step.
+ARG CODEX_VERSION=0.160.1
+# radar-gh needs gh api --slurp (gh 2.48+); Debian's gh is older.
+ARG GH_VERSION=2.101.0
+ARG GH_SHA256_amd64=9bca2d1c16825f109907a23307628a2f0698fbf99662b73a5cf0b020293072b8
+ARG GH_SHA256_arm64=b57e8063f18862647c9d22727c32e9da1b963f8bf9db648fe123a6975695640f
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl git; \
+    case "${TARGETARCH}" in amd64) sum="${GH_SHA256_amd64}" ;; arm64) sum="${GH_SHA256_arm64}" ;; *) exit 1 ;; esac; \
+    curl -fsSL -o /tmp/gh.tgz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${TARGETARCH}.tar.gz"; \
+    echo "${sum}  /tmp/gh.tgz" | sha256sum -c -; \
+    tar -xzf /tmp/gh.tgz -C /tmp; \
+    install -m 0755 "/tmp/gh_${GH_VERSION}_linux_${TARGETARCH}/bin/gh" /usr/local/bin/gh; \
+    rm -rf /tmp/gh.tgz "/tmp/gh_${GH_VERSION}_linux_${TARGETARCH}"; \
+    npm install -g --no-fund --no-audit "@openai/codex@${CODEX_VERSION}"; \
+    npm cache clean --force; \
+    apt-get purge -y curl; apt-get autoremove -y; rm -rf /var/lib/apt/lists/*; \
+    codex --version; gh --version; git --version; \
+    # Two users: the server container runs as radar-mcp, the reviewer container
+    # (and so Codex) as radar-review. Neither owns the other's files.
+    groupadd --gid 65532 radar-mcp; useradd --uid 65532 --gid 65532 --no-create-home --shell /usr/sbin/nologin radar-mcp; \
+    groupadd --gid 65533 radar-review; useradd --uid 65533 --gid 65533 --no-create-home --shell /usr/sbin/nologin radar-review
+COPY --from=build /out/radar-mcp /out/radar-gh /usr/local/bin/
+COPY review-packs/ /opt/radar/review-packs/
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/radar-mcp"]
+CMD ["serve"]

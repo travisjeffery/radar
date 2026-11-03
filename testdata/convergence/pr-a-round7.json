@@ -1,0 +1,169 @@
+{
+ "source": "an anonymised real pull request",
+ "round": 7,
+ "prior": {
+  "head": "4ca8d5e54bdcc4aa137933f66cc5e1099ec6579a",
+  "round": 6,
+  "findings": [
+   {
+    "id": "188f26e82a41",
+    "severity": "P0",
+    "title": "Finding 27",
+    "file": "pkg1/pkg2/pkg3/file1.py",
+    "line": 346,
+    "end_line": 352
+   },
+   {
+    "id": "a3b13dec0d39",
+    "severity": "P0",
+    "title": "Finding 28",
+    "file": "pkg1/pkg4/pkg5/file2.py",
+    "line": 540,
+    "end_line": 545
+   },
+   {
+    "id": "99e9649de749",
+    "severity": "P1",
+    "title": "Finding 29",
+    "file": "pkg1/pkg2/pkg3/file1.py",
+    "line": 326,
+    "end_line": 338
+   },
+   {
+    "id": "9e8d2dc11a43",
+    "severity": "P1",
+    "title": "Finding 30",
+    "file": "pkg1/pkg2/pkg7/file4.py",
+    "line": 225,
+    "end_line": 227
+   },
+   {
+    "id": "e0ba4017aef0",
+    "severity": "P2",
+    "title": "Finding 31",
+    "file": "pkg1/pkg2/pkg3/file1.py",
+    "line": 308,
+    "end_line": 308
+   },
+   {
+    "id": "3722cba5b3e6",
+    "severity": "P2",
+    "title": "Finding 32",
+    "file": "pkg1/pkg2/pkg3/file1.py",
+    "line": 491,
+    "end_line": 508
+   },
+   {
+    "id": "e4e2ac6d93c7",
+    "severity": "P2",
+    "title": "Finding 33",
+    "file": "pkg1/pkg2/pkg8/pkg9/pkg10/file6.py",
+    "line": 78,
+    "end_line": 110
+   },
+   {
+    "id": "d311ea3a1f55",
+    "severity": "P2",
+    "title": "Finding 34",
+    "file": "pkg1/pkg2/pkg7/file4.py",
+    "line": 221,
+    "end_line": 231
+   },
+   {
+    "id": "39a1940a1331",
+    "severity": "P2",
+    "title": "Finding 35",
+    "file": "pkg1/pkg4/pkg5/file8.py",
+    "line": 37,
+    "end_line": 38
+   },
+   {
+    "id": "f7b478f25b8b",
+    "severity": "P3",
+    "title": "Finding 36",
+    "file": "pkg1/pkg2/pkg3/file1.py",
+    "line": 303,
+    "end_line": 345
+   }
+  ],
+  "changes": [
+   {
+    "path": "pkg1/pkg2/pkg3/file1.py",
+    "status": "modified",
+    "patch": "@@ -50,6 +50,7 @@\n line\n line\n line\n+line\n line\n line\n line\n@@ -159,15 +160,21 @@\n line\n line\n line\n-line\n+line\n line\n line\n line\n line\n line\n-line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n line\n-line\n+line\n line\n line\n line\n@@ -255,9 +262,13 @@\n line\n line\n line\n-line\n-line\n-line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n line\n line\n line\n@@ -305,9 +316,16 @@\n line\n line\n line\n-line\n line\n-line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n line\n line\n line\n@@ -488,7 +506,7 @@\n line\n line\n line\n-line\n+line\n line\n line\n line"
+   },
+   {
+    "path": "pkg1/pkg2/pkg7/file4.py",
+    "status": "modified",
+    "patch": "@@ -23,6 +23,19 @@\n line\n line\n line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n line\n line\n line\n@@ -216,15 +229,19 @@\n line\n line\n line\n+line\n+line\n+line\n+line\n line\n line\n line\n line\n line\n line\n-line\n+line\n line\n-line\n+line\n line\n line\n line"
+   },
+   {
+    "path": "pkg1/pkg4/pkg5/file2.py",
+    "status": "modified",
+    "patch": "@@ -251,11 +251,14 @@\n line\n line\n line\n-line\n-line\n-line\n-line\n-line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n line\n line\n line\n@@ -272,6 +275,10 @@\n line\n line\n line\n+line\n+line\n+line\n+line\n line\n line\n line\n@@ -281,7 +288,7 @@\n line\n line\n line\n-line\n+line\n line\n line\n line\n@@ -310,25 +317,23 @@\n line\n line\n line\n-line\n-line\n+line\n line\n line\n-line\n line\n-line\n-line\n+line\n+line\n+line\n line\n line\n-line\n line\n line\n-line\n-line\n-line\n-line\n-line\n-line\n+line\n+line\n+line\n+line\n+line\n+line\n line\n line\n line\n@@ -348,7 +353,10 @@\n line\n line\n line\n-line\n+line\n+line\n+line\n+line\n line\n line\n line\n@@ -359,8 +367,8 @@\n line\n line\n line\n-line\n-line\n+line\n+line\n line\n line\n line"
+   },
+   {
+    "path": "pkg1/pkg4/pkg6/file3.py",
+    "status": "modified"
+   }
+  ],
+  "changes_complete": true
+ },
+ "resolved_findings": [],
+ "head": "3730211ad60b8ac74a9aeca1bf6b04994e48505a",
+ "findings": [
+  {
+   "id": "804250d43096",
+   "severity": "P0",
+   "title": "Finding 21",
+   "file": "pkg1/pkg2/pkg3/file1.py",
+   "line": 365,
+   "end_line": 370
+  },
+  {
+   "id": "5585f826f954",
+   "severity": "P0",
+   "title": "Finding 22",
+   "file": "pkg1/pkg4/pkg5/file5.py",
+   "line": 85,
+   "end_line": 85
+  },
+  {
+   "id": "604531b7c630",
+   "severity": "P0",
+   "title": "Finding 23",
+   "file": "pkg1/pkg4/pkg5/file2.py",
+   "line": 550,
+   "end_line": 553
+  },
+  {
+   "id": "d5207d004e36",
+   "severity": "P1",
+   "title": "Finding 24",
+   "file": "pkg1/pkg2/pkg3/file1.py",
+   "line": 320,
+   "end_line": 330
+  },
+  {
+   "id": "9599da772ee7",
+   "severity": "P1",
+   "title": "Finding 25",
+   "file": "pkg1/pkg2/pkg3/file1.py",
+   "line": 509,
+   "end_line": 526
+  },
+  {
+   "id": "fc07d0519f1c",
+   "severity": "P1",
+   "title": "Finding 26",
+   "file": "pkg1/pkg4/pkg5/file2.py",
+   "line": 449,
+   "end_line": 451
+  }
+ ],
+ "want_held": {
+  "fc07d0519f1c": "unchanged-lines"
+ },
+ "want_action": "route-to-human",
+ "note": "Round 7 of 10. Two P0s repeat round 6's or sit on changed lines and count. A new P1 on an unchanged test is held. One P0 was raised in round 3, dropped in rounds 4-6 and raised again on unchanged lines: only the previous round is compared, but a P0 is never held for being raised late, so it counts."
+}

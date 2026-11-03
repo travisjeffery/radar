@@ -1,0 +1,19 @@
+# Radar review criteria: which review packs and which per-area approval
+# policy apply to which paths. Name it from the policy's review_criteria.rules.
+version: 1
+repo_guidance: [CLAUDE.md]
+areas:
+  - name: go
+    paths: ["**/*.go"]
+    packs: [go]
+  - name: iam
+    paths: ["infra/iam/**", "**/*kms*"]
+    packs: [iam-least-privilege]
+    policy:
+      auto_approve: false
+  - name: migrations
+    paths: ["**/migrations/**"]
+    packs: [sql-migrations]
+    policy:
+      decline_blocks: true
+      max_findings: {P2: 0}

@@ -1,0 +1,181 @@
+{
+ "source": "an anonymised real pull request",
+ "round": 4,
+ "prior": {
+  "head": "cae6b5891247ae1a66f2f0e74c01890d58909595",
+  "round": 3,
+  "findings": [
+   {
+    "id": "d1f76dfb5d00",
+    "severity": "P1",
+    "title": "Finding 45",
+    "file": "pkg11/pkg12/pkg13/pkg15/file11.go",
+    "line": 1702,
+    "end_line": 1709
+   },
+   {
+    "id": "ca7ad6312e5a",
+    "severity": "P1",
+    "title": "Finding 46",
+    "file": "pkg11/pkg12/pkg13/pkg15/file11.go",
+    "line": 1707,
+    "end_line": 1708,
+    "rule_id": "RULE-03"
+   },
+   {
+    "id": "ee1bb64e4f9a",
+    "severity": "P1",
+    "title": "Finding 43",
+    "file": "pkg11/pkg12/pkg13/pkg14/file9.go",
+    "line": 20,
+    "end_line": 31,
+    "rule_id": "RULE-01"
+   },
+   {
+    "id": "f7943a210ed4",
+    "severity": "P1",
+    "title": "Finding 44",
+    "file": "pkg11/pkg12/pkg13/pkg14/file9.go",
+    "line": 96,
+    "end_line": 99,
+    "rule_id": "RULE-02"
+   },
+   {
+    "id": "bbe8d8c77225",
+    "severity": "P2",
+    "title": "Finding 47",
+    "file": "pkg11/pkg16/file12.sh",
+    "line": 23,
+    "end_line": 35,
+    "rule_id": "RULE-04"
+   },
+   {
+    "id": "cf23a000b9d7",
+    "severity": "P3",
+    "title": "Finding 48",
+    "file": "pkg11/pkg12/pkg13/pkg15/file11.go",
+    "line": 1708,
+    "end_line": 1708
+   }
+  ],
+  "changes": [
+   {
+    "path": "pkg11/pkg12/pkg13/pkg15/file11.go",
+    "status": "modified"
+   },
+   {
+    "path": "pkg11/pkg12/pkg13/pkg15/file13.go",
+    "status": "modified"
+   },
+   {
+    "path": "pkg11/pkg12/pkg13/pkg15/file14.go",
+    "status": "modified"
+   },
+   {
+    "path": "pkg11/pkg12/pkg13/pkg15/file15.go",
+    "status": "modified"
+   },
+   {
+    "path": "pkg11/pkg12/pkg13/pkg14/file9.go",
+    "status": "modified",
+    "patch": "@@ -64,6 +64,18 @@\n line\n line\n line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n+line\n line\n line\n line"
+   },
+   {
+    "path": "pkg11/pkg12/pkg13/pkg14/file16.go",
+    "status": "modified"
+   }
+  ],
+  "changes_complete": true
+ },
+ "resolved_findings": [
+  {
+   "by_pr_author": true,
+   "file": "pkg11/pkg12/pkg13/pkg15/file10.go",
+   "finding_id": "81bd39ddc7af",
+   "line": 60,
+   "resolved_by": "user1",
+   "title": "Finding 39"
+  },
+  {
+   "by_pr_author": true,
+   "end_line": 28,
+   "file": "pkg11/pkg12/pkg13/pkg14/file9.go",
+   "finding_id": "55d7e67d8245",
+   "line": 24,
+   "resolved_by": "user1",
+   "title": "Finding 40"
+  },
+  {
+   "by_pr_author": true,
+   "end_line": 148,
+   "file": "pkg11/pkg12/pkg13/pkg14/file9.go",
+   "finding_id": "055bf913917a",
+   "line": 141,
+   "resolved_by": "user1",
+   "title": "Finding 41"
+  },
+  {
+   "by_pr_author": true,
+   "end_line": 111,
+   "file": "pkg11/pkg12/pkg13/pkg14/file9.go",
+   "finding_id": "e46ac13de3c9",
+   "line": 108,
+   "resolved_by": "user1",
+   "title": "Finding 38"
+  },
+  {
+   "by_pr_author": true,
+   "end_line": 162,
+   "file": "pkg11/pkg12/pkg13/pkg14/file9.go",
+   "finding_id": "4328eb210c73",
+   "line": 153,
+   "resolved_by": "user1",
+   "title": "Finding 42"
+  },
+  {
+   "by_pr_author": true,
+   "end_line": 31,
+   "file": "pkg11/pkg12/pkg13/pkg14/file9.go",
+   "finding_id": "ee1bb64e4f9a",
+   "line": 20,
+   "resolved_by": "user1",
+   "title": "Finding 43"
+  },
+  {
+   "by_pr_author": true,
+   "end_line": 111,
+   "file": "pkg11/pkg12/pkg13/pkg14/file9.go",
+   "finding_id": "f7943a210ed4",
+   "line": 108,
+   "resolved_by": "user1",
+   "title": "Finding 44"
+  }
+ ],
+ "head": "65f2c710146d4bbe866d3d174f64e5475d929233",
+ "findings": [
+  {
+   "id": "43abb7b989cf",
+   "severity": "P1",
+   "title": "Finding 37",
+   "file": "pkg11/pkg12/pkg13/pkg14/file9.go",
+   "line": 20,
+   "end_line": 31,
+   "rule_id": "RULE-01"
+  },
+  {
+   "id": "e46ac13de3c9",
+   "severity": "P1",
+   "title": "Finding 38",
+   "file": "pkg11/pkg12/pkg13/pkg14/file9.go",
+   "line": 108,
+   "end_line": 111,
+   "rule_id": "RULE-02"
+  }
+ ],
+ "want_held": {
+  "e46ac13de3c9": "resolved-thread",
+  "43abb7b989cf": "resolved-thread"
+ },
+ "want_action": "route-to-human",
+ "note": "Round 4 of 4. Both blockers repeat findings the author answered and resolved in rounds 1-3, each matched by place to a thread at the same lines, so neither blocks. The author resolved them, so review.prior-decisions routes to a human, as an assertion does for a clarification. Resolved threads are as of round 4's head, which is the pull request's current head."
+}
