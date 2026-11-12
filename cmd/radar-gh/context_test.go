@@ -12,7 +12,7 @@ func TestLinkedIssueKey(t *testing.T) {
 		{"ENG-123: Fold the bot", "", "ENG-123"},
 		{"Fix flake", "tj/eng-123-fold-the-codex", "ENG-123"},
 		{"Bump grpc to 1.2-3", "dependabot/go/grpc", ""},
-		{"OPS-4567 role", "x", "OPS-4567"},
+		{"ABC-4567 role", "x", "ABC-4567"},
 	} {
 		if got := linkedIssueKey(tt.title, tt.branch); got != tt.want {
 			t.Fatalf("linkedIssueKey(%q, %q) = %q, want %q", tt.title, tt.branch, got, tt.want)

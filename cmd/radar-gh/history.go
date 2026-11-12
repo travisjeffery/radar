@@ -109,7 +109,8 @@ func fetchChanges(repo, base, head string) ([]radar.PullRequestFile, bool, error
 	if len(cmp.Files) >= maxCompareFiles {
 		return nil, false, fmt.Errorf("the comparison lists %d files, GitHub's limit; every blocking finding counts", len(cmp.Files))
 	}
-	files := toPullRequestFiles(cmp.Files)
+	// head descends from base, so the files are relative to base itself.
+	files := toPullRequestFiles(cmp.Files, newBaseBlobs(repo, atCommit(base)).blob)
 	for i := range files {
 		// A patch GitHub cut short would hide changed lines: without a
 		// patch the file counts as wholly changed.

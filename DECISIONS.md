@@ -3,6 +3,28 @@
 Policy decisions behind Radar's review-findings basis, newest first, with the
 reasoning behind each.
 
+## Docs and tests pass at confidence 7, and advisory lock bumps without a manifest (2026-11-11)
+
+A confidence floor of 8 sends low-risk changes to a human for no gain: documentation and test-only changes often score 7, and a lockfile changed without its manifest, as in a security bump of a transitive package, always routes.
+
+Both reliefs are per repository and off by default:
+
+- **`low_risk_paths` and `low_risk_min_review_confidence`:** the floor drops by at most one point, only when every changed path matches a low-risk glob exactly. The globs match case exactly, and a rename source must match too, so code renamed into `docs/` keeps the full floor. The rest of the bar still applies: no blocking finding, no defect signal, no structural change, no call for a human. Deny paths and area policy still route first.
+- **`lockfiles.allow_advisory_upgrade`:** a lockfile without a manifest change passes the backstop only when:
+  - every change is an upgrade of a package already locked;
+  - Radar ties every changed line to a package;
+  - the title or description names each upgraded package and cites a GHSA or CVE identifier.
+
+  Source changes still route to a human, and the reviewers still check the lines. The review prompt's P1 for a lockfile without a manifest makes the same exception.
+
+The citation is text the author writes, so it is not proof of an advisory. What bounds the risk is that only upgrades of packages already locked pass, and each one must be named.
+
+## Deny paths and area paths ignore case (2026-11-11)
+
+Path globs matched case exactly, so `**/*iam*` and `**/*secret*` missed `IAMPolicy.java` and `SECRETS.yaml`, and repositories had to list each casing (`**/*Secret*`, `**/*KMS*`). Deny paths and area `paths` now also match with the path and the glob both lowercased. That only adds matches, so more pull requests go to a human and none fewer.
+
+Every other glob keeps the exact match: area `exclude`, allow rules, generated files and base branches. Folding them would let a case difference take a file out of a guard or into a withheld or allowed set.
+
 ## On Windows, Codex reads the checkout through Radar's tools, not a shell (2026-10-31)
 
 On Windows, `codex exec --sandbox read-only` with `approval_policy = "never"` runs no command: with no Windows sandbox backend configured, Codex 0.161 rejects every shell command as "blocked by policy". Local `review-commit` runs on Windows therefore reviewed the patches only (`repo_access: false`).
@@ -55,6 +77,150 @@ the same drain as a rollout, so a running review gets
 - **Per-person limits.** These are counted per replica (`limits.go`), so a
   person can run up to one review on each replica. They stop a runaway
   client but do not cap a person across the fleet.
+
+## A push of only documentation or generated files keeps the review (2026-11-03)
+
+This was first scoped to documentation, lockfiles and generated files, since
+later rounds often change only such files since the last reviewed head.
+Pushes that
+change only comments or formatting in code were left out: telling them apart
+takes a parser per language, and a comment can change what a reviewer
+should conclude.
+
+Lockfiles are left out too. The lockfile backstops catch only a source change and a
+lockfile changed without its manifest; a hash-only change, a downgrade or a
+typosquat is caught only by a reviewer reading the lockfile summary, so a
+lockfile push is always reviewed, for every dependency lockfile Radar knows
+(those it summarizes, a fixed list, and any `*.lock`, `*.lock.*` or
+`*.lockfile` name), whatever the policy calls it. MDX is left out, generated
+or not, because it can import and run code. Agent and review guidance is
+left out because, once merged, it steers every later review. Tools keep
+adding places for it, so the rule is structural rather than a list of
+tools: every dotfile and every path under a dot-directory (`.github/`,
+`.claude/`, `.agents/`, ...), the well-known names outside them (`AGENTS`,
+`AGENT`, `CLAUDE`, `GEMINI`, `CONVENTIONS`, `SKILL`, with override and local
+variants), the suffixes `.instructions.md`, `.prompt.md`, `.chatmode.md` and
+`.agent.md`, and the files the review rules name as guidance. A policy's
+`never_carry_paths` globs name any other file that must always be reviewed:
+Markdown a program reads at run time, or the review packs in the repository
+that hosts them (Radar does not know where a repository keeps its packs).
+None of these files is blanked or dropped from the key either, whether shown
+or withheld, so a change to one that the push comparison does not show, as
+after a retargeted base, is reviewed.
+
+Each recorded review now also keeps `SubstanceKey`: `RequestKey` with the
+contents of documentation files (`.md`, `.markdown`, `.rst`, `.adoc`)
+blanked and without the withheld generated files other than lockfiles.
+Everything else stays as sent, hunk headers included, so a code patch that
+moved is not carried; the moved-lines rule moves those, with its survival proof. File
+names stay in the key, because a review must name exactly the files its
+request shows, so a push that adds or removes a documentation file is
+reviewed anew. A request whose only changes are documentation has no key.
+
+A request reuses an earlier review on `SubstanceKey` only when the complete
+comparison from that review's head shows the push changed nothing but
+documentation and generated paths, from and to for a rename. A review that
+names a file the push changed, under its new or old name, in a finding or a
+pointer, is done anew; a finding that names no file still stands, and one
+naming a path that cannot be a repository path (absolute, as a checkout
+path is, or leaving the repository) blocks, since it cannot be checked. So
+does one on any documentation or generated file, pushed or not: the key
+leaves that file's contents out, so after a retargeted base it may have
+changed unseen. A generated path the pull request adds is reviewed in full,
+as Radar already does, so its contents stay in the key and a push to it is
+reviewed; generated documentation is blanked like any other documentation. The decision counts these reuses in `reused_carried`.
+
+What this gives up: no reviewer reads the new documentation lines. The
+deterministic gates still run on every head. Markdown that a program reads at
+run time (a prompt, an embedded template) is treated as documentation unless
+the policy's `never_carry_paths` names it.
+
+Records written with this carry another new field, `substance`, so a
+radar-gh rolled back past it rejects them (strict decoding) and reviews
+anew, as with the moved-lines and guidance rules. The policy is decoded strictly too, so
+a repository adds `never_carry_paths` only once every caller of its policy
+runs this release, and a rollback past it means removing the field first.
+
+## The same patches reuse an earlier head's review across guidance changes (2026-11-03)
+
+Guidance files (`AGENTS.md`, `CLAUDE.md`,
+directory guidance) are read from the default branch into every request, so
+each guidance edit there changed every open pull request's request and forced
+a fresh review of patches that had not changed.
+
+Each recorded review now also keeps `ContentKey`: `PatchKey` without the
+guidance text, but with every selected review pack named by ID and content
+hash. A request that matches no earlier review exactly or on `PatchKey` but
+matches one on `ContentKey` reuses it, under the moved-lines rule's survival proof and
+line moves. That proof is required even when the hunks sit at the same
+head-side lines, since their base-side numbers may still differ; a hunk
+that did not move has offset 0. So every reuse other than a byte-identical
+request needs the complete comparison from the earlier head, and after a
+force-push the request is reviewed anew. The decision counts these in
+`reused_guidance_changed`.
+
+Review packs stay in the key. A pack change can add a rule, a security rule
+among them, that the earlier review never applied, and packs change rarely,
+so the saving from reusing across them would be small. Guidance is
+conventions and context: a reused review was checked against the earlier
+guidance, and the next push that changes the patches is reviewed against
+the new one. A citation of a rule since removed is dropped, as any unknown
+rule ID is, and listed in `criteria.unknown_rule_citations`. Policy that
+acts on the findings (blocking severities, area policy) governs a reused
+review's verdict as it is now; policy that changes the request (the chunk
+size, the withheld files, a note) changes the key and is reviewed anew.
+
+The chunk budget is the chunk size less the criteria's length, so a guidance
+edit that changes that length can re-split a diff large enough to take
+several requests; those requests then miss and are reviewed anew, which is
+safe but saves less than the estimate on such pull requests.
+`reused_guidance_changed` measures what it does save.
+
+Records written with this carry a third new field, `content`, so as with
+the moved-lines rule a radar-gh rolled back past it rejects them (strict decoding) and
+reviews anew. Records without `content` reuse only by the earlier rules.
+
+## The same patches at moved lines reuse an earlier head's review (2026-11-02)
+
+Later rounds often leave the pull request's own patches unchanged: the same
+added, removed and context lines in every file, as after a merge of the base
+branch. The byte-identical rule misses many of them. Some change hunk line
+numbers only: the base branch had added or removed lines above a hunk, so
+GitHub's `@@` headers differ. Others come from a changed `AGENTS.md` on the
+default branch, which is part of the system prompt.
+
+Each recorded review now also keeps `PatchKey`, the request with every hunk
+header's line numbers dropped (the enclosing function GitHub names after them
+stays), and where each hunk sat. When a request misses the byte-identical
+rule but matches an earlier head's review on `PatchKey`, that review is
+reused, with its findings and pointers moved by their hunk's offset. A
+finding's whole range must sit in one hunk, among the lines that request
+showed (a hunk split across requests counts only its shown lines). Equal
+patches are not proof enough: an author can move the same addition between
+two identical blocks. So a move also needs the complete comparison from that
+earlier head to this one (the one convergence already reads) to show that no
+line of any hunk changed and that each sat exactly its hunk's offset earlier.
+A rebase, whose comparison GitHub cannot follow, is reviewed anew, as is a
+request with a moved deletion-only hunk (no head-side line to check) or with
+patch lines before its first hunk header (a later piece of a split hunk or a
+lockfile piece). Context lines are part of the key, so a base change next to
+a patch is still reviewed anew. A finding or pointer on a line outside the
+patches' hunks cannot be moved with certainty, because the base branch may
+have changed it, so that review is also done anew. The decision records the
+count as `reused_moved`. Reviews are stored under this head's own request, so
+the verdict stage reuses them as before. Any other change to the request
+still misses: a review pack, or a policy change that alters what the request
+shows (the chunk size, the withheld files, a note). Only a guidance change is
+reused across, by the guidance rule. Records written before this carry no `PatchKey`
+and reuse only by the byte-identical rule. Records written with it carry two
+new fields, so a radar-gh rolled back past this change rejects them (strict
+decoding): reuse then falls back to reviewing anew, and a clarification of
+such a head fails. Every stage of a caller runs the same pinned release, so
+this only matters on a rollback.
+
+As with the byte-identical rule, a reviewer that reads the repository saw the earlier
+checkout. Line numbers quoted in free text (a summary, a recommendation, an
+assumption's basis) are that head's and are not moved.
 
 ## A byte-identical request reuses an earlier head's review (2026-10-21)
 

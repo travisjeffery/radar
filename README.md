@@ -179,7 +179,7 @@ paginated GitHub state:
 
 - the PR is open, ready, from the same repository, and targets an allowed base;
 - checks exist, are passing, and have the same fingerprint across two reads;
-- every changed file has a complete patch and one allow rule covers the whole PR;
+- every changed file has a complete patch (a rename that leaves the file's bytes alone has none to give) and one allow rule covers the whole PR;
 - no denied path or phrase matches either side of a rename;
 - no review requests changes and no review thread is unresolved;
 - the PR does not carry the human-review label (see below);
@@ -236,7 +236,10 @@ must pass. `reviewer_min_confidence` lowers the confidence bar for one
 reviewer, keyed by its provenance (for example
 `{"bedrock/us.anthropic.claude-sonnet-5": 7}`), by at most one point. The rest
 of the bar still applies, so a reviewer passing at its floor has raised no
-blocking finding and no defect signal. Pass several to `-agent`, each with its own model:
+blocking finding and no defect signal. `low_risk_paths` with
+`low_risk_min_review_confidence` lowers every reviewer's bar, by at most one
+point, when each changed path (rename sources included) matches a low-risk
+glob exactly, such as documentation and tests. Pass several to `-agent`, each with its own model:
 
 ```sh
 radar-gh review ... -agent openai,fireworks=accounts/fireworks/models/glm-5p3
@@ -305,9 +308,32 @@ were. At the findings stage, `-reuse-prior FILE -reuse-prior-head SHA` offers
 the record of that earlier head; a request that matches one in it byte for
 byte is answered from it, and any other is reviewed anew. A reused review
 joins this head's record (so the verdict stage reuses it too), counts in
-`reused_reviews`, and the decision names the head in `reused_from_head`. The
-caller binds the record to a trusted run of that head, as it does for
-`-reuse`; a record for another head is refused.
+`reused_reviews`, and the decision names the head in `reused_from_head`. A
+request that differs only in where its hunks sit (the same patches, context
+lines and enclosing functions under other `@@` line numbers, as when the base branch added
+lines above them) is also answered from the earlier review, with its findings
+moved by their hunk's offset, and counts in `reused_moved`, once the
+comparison from that head shows the hunks' lines survived the push and only
+shifted. A review naming a
+line or range outside one of its patches' hunks cannot be moved and is done
+anew. A request whose patches match but whose guidance changed on the default
+branch is answered from the earlier review too, and counts in
+`reused_guidance_changed`: its findings were checked against the earlier
+guidance. A change to the review packs still reviews anew. When the push
+since that head changed only documentation (`.md`, `.markdown`, `.rst`,
+`.adoc`) or generated paths, a request that differs from an earlier one only
+in those files' contents is answered from it too, and counts in
+`reused_carried`, unless the review names a file the push changed. A push
+that changes a dependency lockfile, an `.mdx` file, agent or review guidance
+(well-known names such as `AGENTS.md`, `CLAUDE.md` and `SKILL.md`, suffixes
+such as `*.instructions.md`, any dotfile or path under a dot-directory such
+as `.github/` or `.claude/`, and the rules' guidance files) or a path the
+policy's `never_carry_paths` globs name is always reviewed, and those files'
+patches stay in the carry key. Policies are decoded strictly: add
+`never_carry_paths` only once every caller runs a release that knows it. The
+deterministic gates still run on the new head. The caller binds the record to
+a trusted run of that head, as it does for `-reuse`; a record for another
+head is refused.
 
 Each review's `usage` counts only what this run spent: a reused review shows
 no tokens and counts in `reused_requests`, and `cost_usd` estimates the
@@ -377,7 +403,7 @@ retrying), 2 flags that cannot work, 3 a commit no review can cover (no
 changes against the base, or too many files).
 
 Each checkout is otherwise a new fetch from GitHub: two for an agent that
-reads the repository, about 165 MB for a large monorepo. `-git-cache DIR` keeps one
+reads the repository, hundreds of megabytes for a large monorepo. `-git-cache DIR` keeps one
 bare repository per GitHub repository (`DIR/OWNER/REPO.git`) and fetches each
 review's base and head into it, one commit deep, under `refs/radar/<sha>`.
 Git tells GitHub which commits it already has, so a later review downloads
@@ -498,6 +524,10 @@ manifest change. Two deterministic backstops route to a human:
 catalog or `gradle.properties` change anywhere) and
 `require_human_on_source_change` (any registry, index, git or URL source
 change). The decision records the summaries in `lockfiles`.
+`allow_advisory_upgrade` lets a lockfile through the first backstop when it
+only upgrades packages already locked, Radar ties every changed line to a
+package, and the title or description names each upgraded package and cites a
+GHSA or CVE identifier.
 
 #### Review criteria
 
@@ -542,6 +572,11 @@ files git tracks there count as guidance, so a pull request cannot rewrite the
 criteria it is reviewed against. A file withheld as generated selects no packs
 and no guidance, but area policy, like deny paths, applies to every changed
 path, including withheld files and rename sources.
+
+Deny paths and area `paths` match a file whether or not the case agrees, so
+`**/*iam*` also catches `IAMPolicy.java`. Area `exclude` globs, allow rules,
+generated-file globs and base branches match case exactly, so a case
+difference never takes a file out of a guard.
 
 Every area the change touches applies, and their policies merge to the most
 restrictive. Area policy only tightens: `auto_approve: false` (the only allowed

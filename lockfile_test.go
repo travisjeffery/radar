@@ -55,9 +55,9 @@ func TestSummarizeLockfiles(t *testing.T) {
 		name, path, patch, want string
 		unattributed            int
 	}{
-		{name: "poetry bump", path: "rule-recommender/poetry.lock", patch: poetryBumpPatch,
+		{name: "poetry bump", path: "pysvc/poetry.lock", patch: poetryBumpPatch,
 			want: "upgrade pyjwt 2.13.0->2.15.1"},
-		{name: "gradle bump", path: "abac-api/gradle.lockfile", patch: gradleBumpPatch,
+		{name: "gradle bump", path: "jvmsvc/gradle.lockfile", patch: gradleBumpPatch,
 			want: "upgrade com.fasterxml.jackson.core:jackson-core 2.22.1->2.22.3; upgrade com.fasterxml.jackson.core:jackson-databind 2.22.1->2.22.3"},
 		{name: "gradle downgrade", path: "gradle.lockfile",
 			patch: "@@ -1 +1 @@\n-org.yaml:snakeyaml:2.4=runtimeClasspath\n+org.yaml:snakeyaml:1.33=runtimeClasspath",
@@ -84,7 +84,7 @@ func TestSummarizeLockfiles(t *testing.T) {
 			patch: "@@ -10,4 +10,4 @@\n     \"node_modules/@scope/pkg\": {\n       \"version\": \"1.0.0\",\n-      \"resolved\": \"https://registry.npmjs.org/@scope/pkg/-/pkg-1.0.0.tgz\",\n+      \"resolved\": \"https://npm.attacker.example/@scope/pkg/-/pkg-1.0.0.tgz\",",
 			want:  "source-change @scope/pkg https://registry.npmjs.org->https://npm.attacker.example"},
 		// An extras key named "type" is not a source.
-		{name: "poetry package removed with extras", path: "rule-recommender/poetry.lock",
+		{name: "poetry package removed with extras", path: "pysvc/poetry.lock",
 			patch: "@@ -1,9 +1,0 @@\n-[[package]]\n-name = \"setuptools\"\n-version = \"80.10.2\"\n-files = [\n-]\n-\n-[package.extras]\n-type = [\"mypy (==1.14.*)\"]\n-\n [[package]]\n name = \"shellingham\"",
 			want:  "removed setuptools 80.10.2->"},
 		{name: "poetry extras key named type changes", path: "poetry.lock",
@@ -160,15 +160,15 @@ func TestLockfilesAreReviewedNotWithheld(t *testing.T) {
 	agent := &recordingAgent{result: structuralVerdict()}
 	in := safePullRequestInput()
 	in.Files = []PullRequestFile{
-		file("rule-recommender/pyproject.toml", "modified", "@@ -1 +1 @@\n-pyjwt = \"2.13.0\"\n+pyjwt = \"2.15.1\""),
-		file("rule-recommender/poetry.lock", "modified", poetryBumpPatch),
+		file("pysvc/pyproject.toml", "modified", "@@ -1 +1 @@\n-pyjwt = \"2.13.0\"\n+pyjwt = \"2.15.1\""),
+		file("pysvc/poetry.lock", "modified", poetryBumpPatch),
 	}
 	got := lockfileReviewer(t, lockfilePolicy(), agent).Review(in)
 	if got.Action != PullRequestWouldApprove || len(got.Withheld) != 0 || len(got.Lockfiles) != 1 {
 		t.Fatalf("got %s withheld=%v lockfiles=%v; stages %+v", got.Action, got.Withheld, got.Lockfiles, got.Stages)
 	}
 	prompt := renderDiffForReview(agent.seen[0])
-	for _, want := range []string{"upgrade pyjwt 2.13.0 -> 2.15.1", "+version = \"2.15.1\"", "rule-recommender/poetry.lock"} {
+	for _, want := range []string{"upgrade pyjwt 2.13.0 -> 2.15.1", "+version = \"2.15.1\"", "pysvc/poetry.lock"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt lacks %q:\n%s", want, prompt)
 		}
@@ -189,11 +189,11 @@ func TestLockfileBackstops(t *testing.T) {
 	}{
 		{"lockfile without manifest", []PullRequestFile{
 			file("src/app.py", "modified", "@@ -1 +1 @@\n-a\n+b"),
-			file("rule-recommender/poetry.lock", "modified", poetryBumpPatch),
+			file("pysvc/poetry.lock", "modified", poetryBumpPatch),
 		}, PullRequestRouteToHuman},
 		{"manifest in another directory does not count", []PullRequestFile{
 			file("other/pyproject.toml", "modified", "@@ -1 +1 @@\n-a\n+b"),
-			file("rule-recommender/poetry.lock", "modified", poetryBumpPatch),
+			file("pysvc/poetry.lock", "modified", poetryBumpPatch),
 		}, PullRequestRouteToHuman},
 		{"source change with manifest", []PullRequestFile{
 			file("pyproject.toml", "modified", "@@ -1 +1 @@\n-a\n+b"),
@@ -201,11 +201,11 @@ func TestLockfileBackstops(t *testing.T) {
 		}, PullRequestRouteToHuman},
 		{"gradle lockfile with a version catalog change", []PullRequestFile{
 			file("gradle/libs.versions.toml", "modified", "@@ -1 +1 @@\n-jackson = \"2.22.1\"\n+jackson = \"2.22.3\""),
-			file("abac-api/gradle.lockfile", "modified", gradleBumpPatch),
+			file("jvmsvc/gradle.lockfile", "modified", gradleBumpPatch),
 		}, PullRequestWouldApprove},
 		{"gradle lockfile alone", []PullRequestFile{
 			file("src/Main.java", "modified", "@@ -1 +1 @@\n-a\n+b"),
-			file("abac-api/gradle.lockfile", "modified", gradleBumpPatch),
+			file("jvmsvc/gradle.lockfile", "modified", gradleBumpPatch),
 		}, PullRequestRouteToHuman},
 	}
 	for _, tt := range tests {
@@ -273,5 +273,36 @@ func TestLargeLockfileIsSplitNotFailed(t *testing.T) {
 	}
 	if seenLines < 199 {
 		t.Fatalf("only %d of 200 added lines reached the reviewers", seenLines)
+	}
+}
+
+func TestLockfileAdvisoryUpgrade(t *testing.T) {
+	lockOnly := []PullRequestFile{file("pysvc/poetry.lock", "modified", poetryBumpPatch)}
+	tests := []struct {
+		name, title, body string
+		allow             bool
+		files             []PullRequestFile
+		want              PullRequestAction
+	}{
+		{"advisory names the package", "Bump pyjwt to 2.15.1", "Fixes GHSA-2222-3333-4444.", true, lockOnly, PullRequestWouldApprove},
+		{"CVE identifier", "Bump pyjwt", "CVE-2026-12345", true, lockOnly, PullRequestWouldApprove},
+		{"policy off", "Bump pyjwt", "GHSA-2222-3333-4444", false, lockOnly, PullRequestRouteToHuman},
+		{"no advisory", "Bump pyjwt to 2.15.1", "security fix", true, lockOnly, PullRequestRouteToHuman},
+		{"package not named", "Security bump", "GHSA-2222-3333-4444", true, lockOnly, PullRequestRouteToHuman},
+		{"a downgrade is not an upgrade", "Bump pyjwt", "GHSA-2222-3333-4444", true,
+			[]PullRequestFile{file("poetry.lock", "modified", strings.NewReplacer(`-version = "2.13.0"`, `-version = "2.16.0"`).Replace(poetryBumpPatch))},
+			PullRequestRouteToHuman},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy := lockfilePolicy()
+			policy.Lockfiles.AllowAdvisoryUpgrade = tt.allow
+			in := safePullRequestInput()
+			in.Title, in.Body, in.Files = tt.title, tt.body, tt.files
+			got := lockfileReviewer(t, policy, &recordingAgent{result: structuralVerdict()}).Review(in)
+			if got.Action != tt.want {
+				t.Fatalf("got %s, want %s; stages %+v", got.Action, tt.want, got.Stages)
+			}
+		})
 	}
 }

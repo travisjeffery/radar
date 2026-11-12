@@ -299,26 +299,50 @@ func fetchCommitInput(repo, sha, base string) (radar.CommitInput, error) {
 		// Commit messages are context only; the review goes on without the rest.
 		fmt.Fprintf(os.Stderr, "radar-gh review-commit: read %d of %d commit messages\n", len(in.Commits), pages[0].TotalCommits)
 	}
-	in.Files = toPullRequestFiles(files)
+	in.Files = toPullRequestFiles(files, newBaseBlobs(repo, atCommit(in.MergeBaseSHA)).blob)
 	return in, nil
 }
 
 // toPullRequestFiles converts GitHub's file entries, marking a file complete
-// only when GitHub returned its whole patch.
-func toPullRequestFiles(files []githubFile) []radar.PullRequestFile {
+// only when GitHub returned its whole patch. A rename that leaves the file's
+// bytes alone has no patch to return, so it is complete without one; base
+// reads the blob a path had in the commit the files were compared against,
+// and may be nil.
+func toPullRequestFiles(files []githubFile, base blobAt) []radar.PullRequestFile {
 	out := make([]radar.PullRequestFile, 0, len(files))
 	for _, file := range files {
 		patch := ""
 		if file.Patch != nil {
 			patch = *file.Patch
 		}
+		complete := unchangedRename(file, base)
+		if file.Patch != nil {
+			complete = patchLineCountsMatch(patch, file.Additions, file.Deletions)
+		}
 		out = append(out, radar.PullRequestFile{
 			Path: file.Filename, PreviousPath: file.PreviousFilename, Status: file.Status,
 			Additions: file.Additions, Deletions: file.Deletions, Patch: patch,
-			ContentComplete: file.Patch != nil && patchLineCountsMatch(patch, file.Additions, file.Deletions),
+			ContentComplete: complete,
 		})
 	}
 	return out
+}
+
+// unchangedRename reports whether file was renamed with its content intact:
+// its blob at the head is the one its old path had. Line counts cannot say so,
+// because a binary that is renamed and edited also comes back renamed with no
+// patch and 0 additions and 0 deletions. A lookup that fails counts as not
+// proven.
+func unchangedRename(file githubFile, base blobAt) bool {
+	if file.Patch != nil || file.Status != "renamed" || file.PreviousFilename == "" || file.SHA == "" || base == nil {
+		return false
+	}
+	was, err := base(file.PreviousFilename)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "radar-gh: cannot tell whether %s was edited when renamed: %v\n", file.Filename, err)
+		return false
+	}
+	return was == file.SHA
 }
 
 // gitRemoteURL is where checkoutCommit fetches from; tests point it at a

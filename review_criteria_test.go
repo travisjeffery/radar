@@ -397,3 +397,16 @@ func TestUseReviewCriteriaRequiresThePolicysRulesFile(t *testing.T) {
 		t.Fatal("criteria from another rules file were accepted")
 	}
 }
+
+func TestSelectCriteriaAreaPathsIgnoreCaseButExcludesDoNot(t *testing.T) {
+	c := testCriteria(t)
+	c.Rules.Areas = []ReviewArea{{Name: "iam", Paths: []string{"**/*iam*"}, Exclude: []string{"**/tests/**"}, Policy: ReviewAreaPolicy{AutoApprove: falsePtr()}}}
+	for _, path := range []string{"svc/IAMPolicy.java", "svc/Tests/IamRoleTest.java"} {
+		if _, _, policy := c.selectCriteria([]PullRequestFile{{Path: path}}, allReviewed); !policy.humanRequired() {
+			t.Errorf("%s must fall in the iam area", path)
+		}
+	}
+	if _, _, policy := c.selectCriteria([]PullRequestFile{{Path: "svc/tests/iam_test.go"}}, allReviewed); policy.humanRequired() {
+		t.Error("an exact exclude must still remove the area")
+	}
+}

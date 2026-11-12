@@ -19,3 +19,7 @@ go.work.sum
 
 # Radar MCP image build context (scripts/fetch-review-packs.sh)
 /review-packs/
+
+# Python
+__pycache__/
+*.pyc

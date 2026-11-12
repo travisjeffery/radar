@@ -921,3 +921,68 @@ func TestAssumptionsAreRecordedNotDecidedOn(t *testing.T) {
 		t.Fatalf("merged verdict must carry each reviewer's assumptions, got %+v", got.Agent.Assumptions)
 	}
 }
+
+func TestLowRiskMinReviewConfidence(t *testing.T) {
+	policy := findingsPolicy(PullRequestModeShadow)
+	policy.LowRiskPaths = []string{"**/*.md", "**/tests/**"}
+	policy.LowRiskMinReviewConfidence = 7
+	docs := func(paths ...string) PullRequestInput {
+		in := largeFeatureInput(len(paths))
+		for i, p := range paths {
+			in.Files[i].Path = p
+		}
+		return in
+	}
+	renamed := docs("docs/guide.md")
+	renamed.Files[0].Status, renamed.Files[0].PreviousPath = "renamed", "service/src/main/java/Guide.java"
+	tests := []struct {
+		name       string
+		in         PullRequestInput
+		confidence int
+		want       PullRequestAction
+	}{
+		{"docs and tests at the low-risk floor", docs("docs/guide.md", "svc/tests/test_x.py"), 7, PullRequestWouldApprove},
+		{"below the low-risk floor", docs("docs/guide.md"), 6, PullRequestRouteToHuman},
+		{"one code file keeps the policy floor", docs("docs/guide.md", "svc/main.py"), 7, PullRequestRouteToHuman},
+		{"a rename out of code keeps the policy floor", renamed, 7, PullRequestRouteToHuman},
+		{"case differences do not relax the floor", docs("docs/GUIDE.MD"), 7, PullRequestRouteToHuman},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := structuralVerdict()
+			v.Confidence = tt.confidence
+			reviewer, err := NewPullRequestReviewer(policy, fixedScorer(0), &recordingAgent{result: v})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := reviewer.Review(tt.in); got.Action != tt.want {
+				t.Fatalf("got %s, want %s; stages %+v", got.Action, tt.want, got.Stages)
+			}
+		})
+	}
+}
+
+func TestLowRiskMinReviewConfidenceValidation(t *testing.T) {
+	p := findingsPolicy(PullRequestModeShadow)
+	p.LowRiskMinReviewConfidence = 7
+	if err := p.Validate(); err == nil {
+		t.Fatal("a low-risk floor without low_risk_paths must be rejected")
+	}
+	p.LowRiskPaths = []string{"**/*.md"}
+	if err := p.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	p.LowRiskMinReviewConfidence = 6
+	if err := p.Validate(); err == nil {
+		t.Fatal("a low-risk floor more than one point below min_review_confidence must be rejected")
+	}
+	p.LowRiskMinReviewConfidence = 9
+	if err := p.Validate(); err == nil {
+		t.Fatal("a low-risk floor above min_review_confidence must be rejected")
+	}
+	allow := testPullRequestPolicy(PullRequestModeShadow)
+	allow.LowRiskPaths, allow.LowRiskMinReviewConfidence = []string{"**/*.md"}, 9
+	if err := allow.Validate(); err == nil {
+		t.Fatal("the low-risk floor is review-findings only")
+	}
+}

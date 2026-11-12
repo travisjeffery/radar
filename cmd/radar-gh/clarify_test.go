@@ -375,8 +375,8 @@ func TestPlanClarificationsNamedCommits(t *testing.T) {
 		t.Fatal(err)
 	}
 	in := basePlan()
-	in.head = "2dce474a2474e3eacf54bcdc950e8f6151681e03"
-	in.commits = []string{in.head, "eb91a6c1085c0e029f6080575e47be6ae3bf98bd"}
+	in.head = "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432"
+	in.commits = []string{in.head, "c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6"}
 	in.issue = []prComment{comment(1, "reviewer", "User", string(body), clarifyNow)}
 	plan := planClarifications(in)
 	if len(plan.notices) != 0 || len(plan.pending) != 1 || fmt.Sprint(plan.pending[0].FindingIDs) != "["+findingA+"]" {
@@ -385,11 +385,11 @@ func TestPlanClarificationsNamedCommits(t *testing.T) {
 
 	in.open = nil
 	plan = planClarifications(in)
-	if len(plan.notices) != 1 || !strings.Contains(plan.notices[0].Body, "already reviewed `2dce474a2474`") {
+	if len(plan.notices) != 1 || !strings.Contains(plan.notices[0].Body, "already reviewed `9f8e7d6c5b4a`") {
 		t.Fatalf("with nothing open, the notice names the head Radar reviewed: %+v", plan)
 	}
 
-	in.issue = []prComment{comment(2, "reviewer", "User", "/radar `87b679` and `87b679` are fixed in `eb91a6c1085c`", clarifyNow)}
+	in.issue = []prComment{comment(2, "reviewer", "User", "/radar `87b679` and `87b679` are fixed in `c3d4e5f60718`", clarifyNow)}
 	plan = planClarifications(in)
 	if len(plan.notices) != 1 || !strings.Contains(plan.notices[0].Body, "no finding with the ID `87b679` at") {
 		t.Fatalf("a stale ID is named once and the commit not at all: %+v", plan)

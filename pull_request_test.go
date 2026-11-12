@@ -288,3 +288,19 @@ func TestPullRequestPolicyValidatesBlockingSeverities(t *testing.T) {
 		}
 	}
 }
+
+func TestDenyPathsIgnoreCase(t *testing.T) {
+	policy := testPullRequestPolicy(PullRequestModeShadow)
+	policy.DenyPaths = []string{"**/*iam*", "**/security/**"}
+	for _, path := range []string{"svc/IAMPolicy.java", "svc/Security/Filter.java", "svc/iam.go"} {
+		in := safePullRequestInput()
+		in.Files[0].Path = path
+		if denied, reason := pullRequestDenied(policy, in, ""); !denied {
+			t.Errorf("%s not denied: %s", path, reason)
+		}
+	}
+	in := safePullRequestInput()
+	if denied, reason := pullRequestDenied(policy, in, ""); denied {
+		t.Errorf("docs/setup.md denied: %s", reason)
+	}
+}

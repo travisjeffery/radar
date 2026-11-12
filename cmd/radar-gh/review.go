@@ -40,6 +40,7 @@ type githubPullRequest struct {
 	} `json:"user"`
 	Base struct {
 		Ref  string `json:"ref"`
+		SHA  string `json:"sha"`
 		Repo struct {
 			FullName string `json:"full_name"`
 		} `json:"repo"`
@@ -59,6 +60,8 @@ type githubFile struct {
 	Additions        int     `json:"additions"`
 	Deletions        int     `json:"deletions"`
 	Patch            *string `json:"patch"`
+	// SHA is the file's blob at the head.
+	SHA string `json:"sha"`
 }
 
 type githubReview struct {
@@ -790,7 +793,10 @@ func fetchSnapshot(repo string, number int, policy radar.PullRequestPolicy, verd
 	for _, label := range pr.Labels {
 		labels = append(labels, label.Name)
 	}
-	inputFiles := toPullRequestFiles(files)
+	// A pull request's files are relative to the merge base of its base and head.
+	inputFiles := toPullRequestFiles(files, newBaseBlobs(repo, func() (string, error) {
+		return mergeBaseOf(repo, pr.Base.SHA, pr.Head.SHA)
+	}).blob)
 	return githubSnapshot{
 		Input: radar.PullRequestInput{
 			ID: fmt.Sprintf("%s#%d", repo, number), Repository: repo, Number: number,
