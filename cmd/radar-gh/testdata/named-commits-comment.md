@@ -1,9 +1,9 @@
 /radar
 
-Round 4 (review of `eb91a6c1085c`).
+Round 4 (review of `c3d4e5f60718`).
 
-**"Policy-limit test covers only one bundle shape" (P2): fixed in `2dce474a24`.** `TestRolesStayWithinThePoliciesPerRoleLimit` builds each role with the real bundle constructors and the real managed policy. It counts the role's own attached policies, so a further attachment fails the test, including one added inside the role constructor:
-- the API service (`sharedPolicies` + `podRoleSplit`) is checked at ≤ 10 for both shared-bundle shapes. The scoped shape is covered twice, once via `use_service_roles` and once via `use_new_pod_policy`; the unscoped shape once.
-- the workers (`dedicatedPolicies` + `namedPodRoleSplit`) are pinned at exactly 10.
+**"Retry test covers only one backoff shape" (P2): fixed in `9f8e7d6c5b`.** `TestRetryStopsAtTheAttemptLimit` builds each client with the real option constructors and the real default policy. It counts the attempts the client makes, so a further retry fails the test, including one added inside the client constructor:
+- the HTTP client (`withBackoff` + `jitteredDelay`) is checked at ≤ 5 attempts for both backoff shapes. The capped shape is covered twice, once via `max_delay` and once via `deadline`; the uncapped shape once.
+- the queue consumer (`fixedDelay` + `namedRetryPolicy`) is pinned at exactly 5.
 
-**"Resolve or explicitly accept legacy access from older roles" (P2): no code.** Roles without the new policy keep the legacy `queue-<ns>-*` reach over the regional names, including `CreateBucket` and bucket configuration. That reach is accepted for the transition, pending the security owner's sign-off, and is listed under Known limits in the PR body. On every role that writes or replays, the Denies from `eb91a6c108` already narrow it to object access in the deployment account. Retiring the legacy grants is tracked in [OPS-1854](https://tracker.example.com/OPS-1854) ("Retire the legacy queue-<namespace>-* grants"), a sub-issue of OPS-1829.
+**"Decide what happens to callers on the old retry setting" (P2): no code.** Callers that never set the new option keep the old unbounded retry on idempotent requests. That is kept for now and listed under Known limits in the PR body. On every non-idempotent call, the guard from `c3d4e5f607` already limits it to a single attempt. Removing the old setting is tracked in [ENG-901](https://tracker.example.com/ENG-901) ("Remove the unbounded retry setting"), a sub-issue of ENG-900.

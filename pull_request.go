@@ -174,9 +174,21 @@ type PullRequestPolicy struct {
 	// raised no blocking finding and no defect signal. A floor may sit at
 	// most one point below min_review_confidence.
 	ReviewerMinConfidence map[string]int `json:"reviewer_min_confidence,omitempty"`
+	// LowRiskPaths name files, such as documentation and tests, whose
+	// changes alone may pass at LowRiskMinReviewConfidence. They
+	// match case exactly, so a case difference never relaxes the floor.
+	LowRiskPaths []string `json:"low_risk_paths,omitempty"`
+	// LowRiskMinReviewConfidence is every reviewer's floor when each changed
+	// path, rename sources included, matches LowRiskPaths. Review-findings
+	// only, at most one point below min_review_confidence; zero turns it off.
+	LowRiskMinReviewConfidence int `json:"low_risk_min_review_confidence,omitempty"`
 	// ReviewCriteria selects review packs, guidance and per-area policy from
 	// a rules file in the trusted checkout the policy is read from.
 	ReviewCriteria *PullRequestReviewCriteria `json:"review_criteria,omitempty"`
+	// NeverCarryPaths are globs of files whose change always gets a new
+	// review, though they look like documentation or generated output:
+	// Markdown a program reads at run time, say, or review packs.
+	NeverCarryPaths []string `json:"never_carry_paths,omitempty"`
 	// HumanReviewLabel is the label that opts a pull request out of
 	// auto-approval. Empty means DefaultHumanReviewLabel; it cannot be
 	// switched off.
@@ -212,6 +224,20 @@ type PullRequestReviewCriteria struct {
 // maxConfidenceRelief is how far a reviewer's floor may sit below the
 // policy's min_review_confidence.
 const maxConfidenceRelief = 1
+
+// lowRisk reports whether every changed path, rename sources included,
+// matches LowRiskPaths and the policy sets a low-risk floor.
+func (p PullRequestPolicy) lowRisk(files []PullRequestFile) bool {
+	if p.LowRiskMinReviewConfidence == 0 || len(files) == 0 {
+		return false
+	}
+	for _, f := range files {
+		if !matchesAnyPath(f.Path, p.LowRiskPaths) || (f.PreviousPath != "" && !matchesAnyPath(f.PreviousPath, p.LowRiskPaths)) {
+			return false
+		}
+	}
+	return true
+}
 
 func (p PullRequestPolicy) minConfidenceFor(reviewer string) int {
 	if floor, ok := p.ReviewerMinConfidence[reviewer]; ok {
@@ -275,6 +301,22 @@ type PullRequestReview struct {
 	// ReusedFromHead is the earlier head whose recorded reviews answered
 	// some of this head's requests, when any did.
 	ReusedFromHead string `json:"reused_from_head,omitempty"`
+	// ReusedMoved counts the reviews reused from ReusedFromHead whose
+	// patches were the same but sat at other head-side lines, as after the
+	// base branch changed lines above them; their findings were moved with
+	// the patches. The rest were byte-identical requests, or the
+	// same patches at the same head-side lines under other base-side hunk
+	// numbers or other guidance.
+	ReusedMoved int `json:"reused_moved,omitempty"`
+	// ReusedGuidanceChanged counts the reviews reused from ReusedFromHead
+	// although the repository's guidance changed since: their
+	// findings were checked against the earlier guidance. A review-pack
+	// change still reviews anew.
+	ReusedGuidanceChanged int `json:"reused_guidance_changed,omitempty"`
+	// ReusedCarried counts the reviews reused from ReusedFromHead because
+	// the push since changed only documentation or generated files.
+	// The deterministic gates still ran on this head.
+	ReusedCarried int `json:"reused_carried,omitempty"`
 	// PullRequestTotals is the pull request's review count and estimated
 	// cost so far, when the adapter keeps them.
 	PullRequestTotals *PullRequestTotals `json:"pull_request_totals,omitempty"`
@@ -308,6 +350,8 @@ type PullRequestReviewer struct {
 	calibrator *Calibrator
 	agents     []ReviewAgent
 	generated  generatedMatcher
+	// neverCarry are the policy's never_carry_paths, compiled once.
+	neverCarry []*regexp.Regexp
 	criteria   *ReviewCriteria
 	memo       *reviewMemo
 	// clarifications are the pull request's clarification outcomes, applied
@@ -345,7 +389,40 @@ func NewPullRequestReviewer(policy PullRequestPolicy, scorer RiskScorer, agents 
 	if policy.GeneratedFiles != nil {
 		r.generated = newGeneratedMatcher(*policy.GeneratedFiles, nil)
 	}
+	for _, glob := range policy.NeverCarryPaths {
+		// Validated with the policy above.
+		re, _ := compilePathGlob(glob)
+		r.neverCarry = append(r.neverCarry, re)
+	}
+	r.memo.trivial = r.trivialPath
 	return r, nil
+}
+
+// trivialPath reports a file whose changes alone carry the last review
+// forward: documentation, or a path the trusted policy or
+// .gitattributes marks generated. A generated file the pull request adds is
+// shown in full, so a change to it still changes the request's SubstanceKey
+// and is reviewed. Never trivial:
+//   - a dependency lockfile: the deterministic backstops do not catch a
+//     hash-only change, a downgrade or a typosquat, which only a reviewer
+//     reading it does;
+//   - agent and review guidance, which steers every later review once
+//     merged;
+//   - a path the policy's never_carry_paths names.
+func (r *PullRequestReviewer) trivialPath(p string) bool {
+	// MDX can import and run code, generated or not.
+	if strings.EqualFold(path.Ext(p), ".mdx") || dependencyLockfile(p) || agentGuidanceFile(p) {
+		return false
+	}
+	for _, re := range r.neverCarry {
+		if re.MatchString(p) {
+			return false
+		}
+	}
+	if r.criteria != nil && r.criteria.Rules.IsGuidanceFile(p) {
+		return false
+	}
+	return isDocPath(p) || r.generated.pathGenerated(p)
 }
 
 // UseGitattributes adds the linguist-generated paths of a trusted
@@ -500,9 +577,17 @@ func (p PullRequestPolicy) Validate() error {
 			}
 		}
 	}
-	for _, pattern := range p.DenyPaths {
+	for _, pattern := range append(append(append([]string{}, p.DenyPaths...), p.NeverCarryPaths...), p.LowRiskPaths...) {
 		if _, err := compilePathGlob(pattern); err != nil {
 			return err
+		}
+	}
+	if c := p.LowRiskMinReviewConfidence; c != 0 {
+		if p.basis() != ApprovalBasisReviewFindings || len(p.LowRiskPaths) == 0 {
+			return fmt.Errorf("radar: low_risk_min_review_confidence requires approval basis review-findings and low_risk_paths")
+		}
+		if c < p.MinReviewConfidence-maxConfidenceRelief || c > p.MinReviewConfidence {
+			return fmt.Errorf("radar: low_risk_min_review_confidence must be between %d and %d", p.MinReviewConfidence-maxConfidenceRelief, p.MinReviewConfidence)
 		}
 	}
 	return p.validateAuthorTrust()
@@ -520,6 +605,7 @@ func (r *PullRequestReviewer) Review(in PullRequestInput) PullRequestReview {
 // approves and its action is always findings-only. Record the agents'
 // verdicts with ReviewRecord so the verdict stage reuses them.
 func (r *PullRequestReviewer) Findings(in PullRequestInput) PullRequestReview {
+	r.memo.usePush(in.Prior)
 	out, _ := r.evaluate(in, StageFindings)
 	return out
 }
@@ -546,6 +632,9 @@ func (r *PullRequestReviewer) evaluate(in PullRequestInput, stage string) (PullR
 	r.memo.mu.Lock()
 	out.ReusedReviews, r.memo.reused = r.memo.reused, 0
 	out.ReusedFromHead, r.memo.reusedFrom = r.memo.reusedFrom, ""
+	out.ReusedMoved, r.memo.reusedMoved = r.memo.reusedMoved, 0
+	out.ReusedGuidanceChanged, r.memo.reusedGuidance = r.memo.reusedGuidance, 0
+	out.ReusedCarried, r.memo.reusedCarried = r.memo.reusedCarried, 0
 	r.memo.mu.Unlock()
 	out.VerdictReason = verdictReason(out)
 	out.Stage = stage
@@ -617,7 +706,7 @@ func (r *PullRequestReviewer) evaluateStages(in PullRequestInput, stage string) 
 	lockfiles := r.lockfileSummaries(in)
 	out.Lockfiles = lockfiles
 	if r.policy.Lockfiles != nil && len(lockfiles) > 0 {
-		backstop, reason := lockfileBackstop(*r.policy.Lockfiles, in.Files, lockfiles)
+		backstop, reason := lockfileBackstop(*r.policy.Lockfiles, in.Files, lockfiles, in.Title+"\n"+in.Body)
 		add("pr.lockfile-policy", !backstop, reason)
 		denied = denied || backstop
 	}
@@ -677,7 +766,7 @@ func (r *PullRequestReviewer) evaluateStages(in PullRequestInput, stage string) 
 	if len(reviewDiff.Changes) == 0 {
 		add("pr.review-agent", false, fmt.Sprintf("all %d changed files are generated; nothing for the review agents to assess", len(out.Withheld)))
 	} else {
-		agentPassed, facts.results = r.runReviewers(&out, reviewDiff, budget, areaPolicy, newConvergence(in), add)
+		agentPassed, facts.results = r.runReviewers(&out, reviewDiff, budget, areaPolicy, r.policy.lowRisk(in.Files), newConvergence(in), add)
 		facts.agentReviewed = true
 	}
 	facts.diff = reviewDiff
@@ -809,7 +898,7 @@ func (r *PullRequestReviewer) reviewableDiff(diff Diff, in PullRequestInput, loc
 
 // runReviewers runs every agent concurrently and records each verdict. It
 // passes only when every agent passes.
-func (r *PullRequestReviewer) runReviewers(out *PullRequestReview, diff Diff, budget int, area ReviewAreaPolicy, conv *convergence, add func(string, bool, string) bool) (bool, []ACRResult) {
+func (r *PullRequestReviewer) runReviewers(out *PullRequestReview, diff Diff, budget int, area ReviewAreaPolicy, lowRisk bool, conv *convergence, add func(string, bool, string) bool) (bool, []ACRResult) {
 	results := make([]ACRResult, len(r.agents))
 	var wg sync.WaitGroup
 	for i, agent := range r.agents {
@@ -871,7 +960,7 @@ func (r *PullRequestReviewer) runReviewers(out *PullRequestReview, diff Diff, bu
 	}
 	passed := 0
 	for i, res := range counted {
-		ok, reason := r.reviewerPasses(describeReviewAgent(r.agents[i]), res, diff, area)
+		ok, reason := r.reviewerPasses(describeReviewAgent(r.agents[i]), res, diff, area, lowRisk)
 		if ok {
 			passed++
 		}
@@ -925,10 +1014,13 @@ var defectSignals = map[ChangeSignal]bool{
 	SignalAuthBypass:      true,
 }
 
-func (r *PullRequestReviewer) reviewerPasses(reviewer string, res ACRResult, diff Diff, area ReviewAreaPolicy) (bool, string) {
+func (r *PullRequestReviewer) reviewerPasses(reviewer string, res ACRResult, diff Diff, area ReviewAreaPolicy, lowRisk bool) (bool, string) {
 	minConfidence := r.policy.MinReviewConfidence
 	if r.policy.basis() == ApprovalBasisReviewFindings {
 		minConfidence = r.policy.minConfidenceFor(reviewer)
+		if lowRisk {
+			minConfidence = max(min(minConfidence, r.policy.LowRiskMinReviewConfidence), r.policy.MinReviewConfidence-maxConfidenceRelief)
+		}
 	}
 	return reviewerVerdict(r.policy, area, minConfidence, false, res, diff)
 }
@@ -1155,7 +1247,7 @@ func pullRequestDiff(in PullRequestInput) (Diff, bool, string) {
 func pullRequestDenied(policy PullRequestPolicy, in PullRequestInput, stage string) (bool, string) {
 	for _, f := range in.Files {
 		for _, candidate := range []string{f.Path, f.PreviousPath} {
-			if candidate != "" && matchesAnyPath(candidate, policy.DenyPaths) {
+			if candidate != "" && matchesAnyPathFold(candidate, policy.DenyPaths) {
 				return true, "path is explicitly denied: " + candidate
 			}
 		}
@@ -1246,6 +1338,23 @@ func matchesAnyPath(value string, patterns []string) bool {
 		}
 	}
 	return false
+}
+
+// matchesAnyPathFold reports whether value matches any pattern as written or
+// with both lowercased, so "**/*iam*" also guards IAMPolicy.java.
+// Only the guards use it, deny paths and area paths, where matching more
+// files can only send more pull requests to a human; excludes, allow rules,
+// generated files and base branches keep the exact match, where matching
+// more would relax a gate.
+func matchesAnyPathFold(value string, patterns []string) bool {
+	if matchesAnyPath(value, patterns) {
+		return true
+	}
+	lower := make([]string, len(patterns))
+	for i, p := range patterns {
+		lower[i] = strings.ToLower(p)
+	}
+	return matchesAnyPath(strings.ToLower(value), lower)
 }
 
 func compilePathGlob(glob string) (*regexp.Regexp, error) {

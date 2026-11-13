@@ -9,7 +9,7 @@ changed (the incremental-blocking rule), its inline reactions (👍 real, 👎 n
 whether a clarification withdrew or downgraded it, and whether a later round
 no longer reports it (fixed or dropped).
 
-Usage: rounds.py --since 2026-10-07T12:40:26Z --repo OWNER/REPO > rounds.jsonl
+Usage: rounds.py --since 2026-01-01T00:00:00Z --repo OWNER/REPO > rounds.jsonl
        rounds.py --summarize rounds.jsonl
 """
 import argparse, io, json, re, subprocess, sys, zipfile

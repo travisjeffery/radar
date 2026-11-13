@@ -202,6 +202,11 @@ def run_record(repo, workflow, r):
     rec["round"] = (d.get("convergence") or {}).get("round")
     rec["reused_reviews"] = d.get("reused_reviews", 0)
     rec["reused_from_head"] = d.get("reused_from_head")  # v0.14.0
+    # Same patches at moved lines. From v0.16.0 it counts only head-side
+    # moves; before, every PatchKey reuse counted.
+    rec["reused_moved"] = d.get("reused_moved", 0)
+    rec["reused_guidance_changed"] = d.get("reused_guidance_changed", 0)  # same patches, other guidance
+    rec["reused_carried"] = d.get("reused_carried", 0)  # push of docs or generated files only
     rec["reviewed_files"] = len((d.get("agent") or {}).get("reviewed_files") or [])
     rec["guidance"] = [g["sha256"][:12] for g in (d.get("criteria") or {}).get("guidance") or [] if g.get("prefix")]
     rec["reviews"] = []
@@ -471,7 +476,10 @@ def summarize(paths):
     print("\n## Reuse across pushes")
     rr = [r for r in fr if r.get("reused_from_head")]
     reused = [(r, rv) for r in fr for rv in r["reviews"] if rv.get("reused")]
-    print(f"findings runs answered partly from an earlier head: {len(rr)} of {len(fr)}; reviews reused: {len(reused)}")
+    print(f"findings runs answered partly from an earlier head: {len(rr)} of {len(fr)}; reviews reused: {len(reused)}"
+          f" ({sum(r.get('reused_moved') or 0 for r in fr)} with their lines moved;"
+          f" {sum(r.get('reused_guidance_changed') or 0 for r in fr)} across a guidance change;"
+          f" {sum(r.get('reused_carried') or 0 for r in fr)} over a trivial push)")
     for name in sorted({rv["reviewer"] for _, rv in reused}):
         n = sum(rv["reviewer"] == name for _, rv in reused)
         xs = [sum(rv["cost"].values()) for _, rv in fresh if rv["reviewer"] == name]

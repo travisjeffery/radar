@@ -351,6 +351,9 @@ type ReviewContext struct {
 	Prefix  string   `json:"prefix,omitempty"`
 	Suffix  string   `json:"suffix,omitempty"`
 	RuleIDs []string `json:"rule_ids,omitempty"`
+	// Packs names every selected pack by ID and content hash, so a reuse
+	// key that leaves the guidance out still changes with the packs.
+	Packs string `json:"packs,omitempty"`
 }
 
 func (c *ReviewContext) chars() int {
@@ -419,7 +422,9 @@ func (c ReviewCriteria) selectCriteria(files []PullRequestFile, reviewed func(Pu
 		for _, f := range files {
 			hit := false
 			for _, candidate := range []string{f.Path, f.PreviousPath} {
-				if candidate != "" && matchesAnyPath(candidate, area.Paths) && !matchesAnyPath(candidate, area.Exclude) {
+				// Paths ignore case and excludes do not, so either
+				// difference keeps the area.
+				if candidate != "" && matchesAnyPathFold(candidate, area.Paths) && !matchesAnyPath(candidate, area.Exclude) {
 					hit = true
 				}
 			}
@@ -513,7 +518,11 @@ func (c ReviewCriteria) selectCriteria(files []PullRequestFile, reviewed func(Pu
 	if prefix.Len() == 0 && suffix.Len() == 0 {
 		return nil, record, policy
 	}
-	return &ReviewContext{Prefix: strings.TrimSpace(prefix.String()), Suffix: strings.TrimSpace(suffix.String()), RuleIDs: ruleIDs}, record, policy
+	packs := make([]string, 0, len(record.Packs))
+	for _, p := range record.Packs {
+		packs = append(packs, p.ID+"@"+p.SHA256)
+	}
+	return &ReviewContext{Prefix: strings.TrimSpace(prefix.String()), Suffix: strings.TrimSpace(suffix.String()), RuleIDs: ruleIDs, Packs: strings.Join(packs, ",")}, record, policy
 }
 
 // directoryGuidanceFor returns the nearest-ancestor guidance file of each

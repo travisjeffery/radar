@@ -109,7 +109,7 @@ Severity measures what this change does, not everything it touches:
 
 Later rounds: the pull request context may say Radar reviewed an earlier head of this pull request and list the lines changed since. The patches still show the whole pull request; review all of it, but look hardest at the changed lines and at what they break elsewhere. Do not raise again a finding the context lists as resolved by a person.
 
-Lockfiles are reviewed like code. A lockfile summary parsed from the patches may precede them; verify it against the patches. Report each of these supply-chain signals as a P1 finding: a package name that imitates a well-known one (typosquat), a new or changed registry, index, git or URL source, a version downgrade, an integrity hash that changes without a version change, a lockfile that changes without a matching manifest change, and a new dependency the manifest changes shown do not explain.
+Lockfiles are reviewed like code. A lockfile summary parsed from the patches may precede them; verify it against the patches. Report each of these supply-chain signals as a P1 finding: a package name that imitates a well-known one (typosquat), a new or changed registry, index, git or URL source, a version downgrade, an integrity hash that changes without a version change, a lockfile that changes without a matching manifest change (unless it only upgrades packages already locked and the pull request names each one and cites a GHSA or CVE advisory for it), and a new dependency the manifest changes shown do not explain.
 
 Generated files may be listed by name without a patch. You cannot review their content; flag a problem only if their presence or size is itself suspicious next to the patches shown.
 

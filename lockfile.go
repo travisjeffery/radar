@@ -20,6 +20,13 @@ type PullRequestLockfiles struct {
 	// RequireHumanOnSourceChange routes to a human any change to where a
 	// package is resolved from: a registry, index, git or URL source.
 	RequireHumanOnSourceChange bool `json:"require_human_on_source_change,omitempty"`
+	// AllowAdvisoryUpgrade lets a lockfile through RequireHumanWithoutManifest
+	// when it only upgrades packages already locked, Radar ties every changed
+	// line to a package, and the pull request's title or description names
+	// each upgraded package and cites a GHSA or CVE identifier: a security
+	// bump of a transitive dependency. Source changes still route
+	// to a human, and the reviewers still review the lines.
+	AllowAdvisoryUpgrade bool `json:"allow_advisory_upgrade,omitempty"`
 }
 
 // LockfileKind names a lockfile format Radar can summarise.
@@ -473,8 +480,28 @@ func manifestFor(kind LockfileKind, lockPath, candidate string) bool {
 	return false
 }
 
+// advisoryID matches a GitHub security advisory or CVE identifier.
+var advisoryID = regexp.MustCompile(`(?i)\bGHSA(?:-[23456789cfghjmpqrvwx]{4}){3}\b|\bCVE-\d{4}-\d{4,}\b`)
+
+// advisoryUpgrade reports whether a lockfile change is only upgrades of
+// packages already locked, every changed line tied to a package, with each
+// package named in text, which cites an advisory.
+func advisoryUpgrade(s LockfileSummary, text string) bool {
+	if len(s.Changes) == 0 || s.Unattributed > 0 || !advisoryID.MatchString(text) {
+		return false
+	}
+	lower := strings.ToLower(text)
+	for _, c := range s.Changes {
+		if c.Kind != "upgrade" || c.Package == "" || !strings.Contains(lower, strings.ToLower(c.Package)) {
+			return false
+		}
+	}
+	return true
+}
+
 // lockfileBackstop is the deterministic human-required rule for lockfiles.
-func lockfileBackstop(cfg PullRequestLockfiles, files []PullRequestFile, summaries []LockfileSummary) (bool, string) {
+// text is the pull request's title and description.
+func lockfileBackstop(cfg PullRequestLockfiles, files []PullRequestFile, summaries []LockfileSummary, text string) (bool, string) {
 	for _, s := range summaries {
 		if cfg.RequireHumanOnSourceChange {
 			for _, c := range s.Changes {
@@ -491,7 +518,7 @@ func lockfileBackstop(cfg PullRequestLockfiles, files []PullRequestFile, summari
 					break
 				}
 			}
-			if !matched {
+			if !matched && !(cfg.AllowAdvisoryUpgrade && advisoryUpgrade(s, text)) {
 				return true, s.Path + " changes without a matching manifest change"
 			}
 		}

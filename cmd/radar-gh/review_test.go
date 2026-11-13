@@ -257,13 +257,13 @@ func TestExampleReviewFindingsPolicyLoads(t *testing.T) {
 }
 
 func TestSnapshotsStableIncludesTheStack(t *testing.T) {
-	base := radar.PullRequestInput{HeadSHA: "h", CheckFingerprint: "c", BaseRef: "ram/a",
-		Stack: []radar.PullRequestStackEntry{{Number: 1, HeadRef: "ram/a", HeadSHA: "p1", BaseRef: "main"}}}
+	base := radar.PullRequestInput{HeadSHA: "h", CheckFingerprint: "c", BaseRef: "dev/a",
+		Stack: []radar.PullRequestStackEntry{{Number: 1, HeadRef: "dev/a", HeadSHA: "p1", BaseRef: "main"}}}
 	if !snapshotsStable(base, base) {
 		t.Fatal("identical snapshots are stable")
 	}
 	moved := base
-	moved.Stack = []radar.PullRequestStackEntry{{Number: 1, HeadRef: "ram/a", HeadSHA: "p2", BaseRef: "main"}}
+	moved.Stack = []radar.PullRequestStackEntry{{Number: 1, HeadRef: "dev/a", HeadSHA: "p2", BaseRef: "main"}}
 	if snapshotsStable(base, moved) {
 		t.Fatal("a parent force-push between observations must not count as stable")
 	}
